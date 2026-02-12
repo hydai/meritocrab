@@ -4,15 +4,17 @@ use crate::{
     state::AppState,
 };
 use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
+use rand::Rng;
 use sc_core::{check_blacklist, check_pr_gate, calculate_delta_with_config, apply_credit, EventType, GateResult};
 use sc_db::{
-    contributors::{lookup_or_create_contributor, update_credit_score},
+    contributors::{lookup_or_create_contributor, update_credit_score, set_blacklisted},
     credit_events::insert_credit_event,
     evaluations::insert_evaluation,
 };
 use sc_github::{PullRequestEvent, IssueCommentEvent, PullRequestReviewEvent};
 use sc_llm::{ContentType, EvalContext};
 use serde_json::Value;
+use std::time::Duration;
 use tracing::{info, warn, error};
 
 /// Webhook handler for GitHub events
@@ -135,24 +137,23 @@ async fn process_pr_opened(state: AppState, event: PullRequestEvent) -> ApiResul
         username, contributor.credit_score
     );
 
-    // Step 3: Check if contributor is blacklisted
-    if check_blacklist(contributor.credit_score, state.repo_config.blacklist_threshold) {
+    // Step 3: Check if contributor is blacklisted (or check is_blacklisted field)
+    if contributor.is_blacklisted || check_blacklist(contributor.credit_score, state.repo_config.blacklist_threshold) {
         warn!(
-            "Contributor {} is blacklisted (credit: {}), closing PR #{}",
-            username, contributor.credit_score, pr_number
+            "Contributor {} is blacklisted (credit: {}, is_blacklisted: {}), scheduling delayed PR close for #{}",
+            username, contributor.credit_score, contributor.is_blacklisted, pr_number
         );
 
-        // Note: Shadow blacklist with randomized delay is Task #7
-        // For now, we just close immediately with a generic message
-        close_pr_with_message(
-            &state,
-            repo_owner,
-            repo_name,
+        // Shadow blacklist: schedule delayed PR close with randomized delay (30-120 seconds)
+        schedule_delayed_pr_close(
+            state.clone(),
+            repo_owner.to_string(),
+            repo_name.to_string(),
             pr_number,
-            "Thank you for your contribution. After review, we've determined this PR doesn't align with the project's current direction.",
-        )
-        .await?;
+            username.to_string(),
+        );
 
+        // Return 200 OK immediately (delay happens in background)
         return Ok(());
     }
 
@@ -225,6 +226,56 @@ async fn close_pr_with_message(
     Ok(())
 }
 
+/// Schedule delayed PR close for shadow blacklist
+///
+/// This spawns a background task that waits a randomized delay (30-120 seconds)
+/// before closing the PR with a generic message. This makes the blacklist less
+/// obvious to bad actors.
+fn schedule_delayed_pr_close(
+    state: AppState,
+    repo_owner: String,
+    repo_name: String,
+    pr_number: u64,
+    username: String,
+) {
+    tokio::spawn(async move {
+        // Generate random delay between 30 and 120 seconds
+        let delay_secs = rand::rng().random_range(30..=120);
+        let delay = Duration::from_secs(delay_secs);
+
+        info!(
+            "Scheduled PR #{} close for blacklisted user {} with delay of {} seconds",
+            pr_number, username, delay_secs
+        );
+
+        // Wait for the randomized delay
+        tokio::time::sleep(delay).await;
+
+        // Close PR with generic message (no mention of blacklist/credit/spam)
+        let generic_message = "Thank you for your contribution. Unfortunately, we are unable to accept this pull request at this time.";
+
+        if let Err(e) = close_pr_with_message(
+            &state,
+            &repo_owner,
+            &repo_name,
+            pr_number,
+            generic_message,
+        )
+        .await
+        {
+            error!(
+                "Failed to close blacklisted PR #{} for {}: {}",
+                pr_number, username, e
+            );
+        } else {
+            info!(
+                "Successfully closed blacklisted PR #{} for {} after {} second delay",
+                pr_number, username, delay_secs
+            );
+        }
+    });
+}
+
 /// Process a pull request review submitted event
 async fn process_pr_review_submitted(state: AppState, event: PullRequestReviewEvent) -> ApiResult<()> {
     let user_id = event.review.user.id;
@@ -282,10 +333,11 @@ async fn process_pr_review_submitted(state: AppState, event: PullRequestReviewEv
 
     // Reviews always grant +5 credit (no LLM evaluation needed)
     let delta = 5;
-    let new_score = apply_credit(contributor.credit_score, delta);
+    let credit_before = contributor.credit_score;
+    let credit_after = apply_credit(credit_before, delta);
 
     // Update contributor credit
-    update_credit_score(&state.db_pool, contributor.id, new_score).await?;
+    update_credit_score(&state.db_pool, contributor.id, credit_after).await?;
 
     // Log credit event
     insert_credit_event(
@@ -293,8 +345,8 @@ async fn process_pr_review_submitted(state: AppState, event: PullRequestReviewEv
         contributor.id,
         "review_submitted",
         delta,
-        contributor.credit_score,
-        new_score,
+        credit_before,
+        credit_after,
         None, // No LLM evaluation for reviews
         None,
     )
@@ -302,8 +354,10 @@ async fn process_pr_review_submitted(state: AppState, event: PullRequestReviewEv
 
     info!(
         "Granted +{} credit to {} for review (new score: {})",
-        delta, username, new_score
+        delta, username, credit_after
     );
+
+    // Note: Reviews always have positive delta, so no auto-blacklist check needed
 
     Ok(())
 }
@@ -546,6 +600,35 @@ async fn evaluate_and_apply_credit(
             "Applied {} credit to {} (confidence {:.2}, new score: {})",
             delta, username, evaluation.confidence, credit_after
         );
+
+        // Auto-blacklist if credit drops to 0 or below
+        if credit_after <= state.repo_config.blacklist_threshold && credit_before > state.repo_config.blacklist_threshold {
+            warn!(
+                "Auto-blacklisting user {} (credit dropped to {})",
+                username, credit_after
+            );
+
+            // Set blacklist flag
+            set_blacklisted(&state.db_pool, contributor_id, true).await?;
+
+            // Log auto-blacklist event
+            insert_credit_event(
+                &state.db_pool,
+                contributor_id,
+                "auto_blacklist",
+                0, // No delta for blacklist event
+                credit_after,
+                credit_after,
+                None,
+                Some(format!("Auto-blacklisted due to credit dropping to {}", credit_after)),
+            )
+            .await?;
+
+            info!(
+                "Successfully auto-blacklisted user {} (credit: {})",
+                username, credit_after
+            );
+        }
     } else {
         // Low confidence: create pending evaluation
         let eval_id = format!(
