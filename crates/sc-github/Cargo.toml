@@ -21,3 +21,4 @@ async-trait = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }
+rustls = { version = "0.23", features = ["aws-lc-rs"] }

@@ -138,6 +138,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_api_client() {
+        // Initialize rustls crypto provider for tests
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+
         let result = GithubApiClient::new("test-token".to_string());
         assert!(result.is_ok());
     }
