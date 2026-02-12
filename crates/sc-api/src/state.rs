@@ -1,3 +1,4 @@
+use crate::repo_config_loader::RepoConfigLoader;
 use axum::extract::FromRef;
 use sc_core::RepoConfig;
 use sc_github::{GithubApiClient, WebhookSecret};
@@ -47,6 +48,9 @@ pub struct AppState {
 
     /// OAuth configuration for admin authentication
     pub oauth_config: OAuthConfig,
+
+    /// Repository configuration loader with caching
+    pub repo_config_loader: Arc<RepoConfigLoader>,
 }
 
 impl AppState {
@@ -59,15 +63,23 @@ impl AppState {
         llm_evaluator: Arc<dyn LlmEvaluator>,
         max_concurrent_llm_evals: usize,
         oauth_config: OAuthConfig,
+        config_cache_ttl_seconds: u64,
     ) -> Self {
+        let github_client_arc = Arc::new(github_client);
+        let repo_config_loader = Arc::new(RepoConfigLoader::new(
+            github_client_arc.clone(),
+            config_cache_ttl_seconds,
+        ));
+
         Self {
             db_pool,
-            github_client: Arc::new(github_client),
+            github_client: github_client_arc,
             repo_config,
             webhook_secret,
             llm_evaluator,
             llm_semaphore: Arc::new(Semaphore::new(max_concurrent_llm_evals)),
             oauth_config,
+            repo_config_loader,
         }
     }
 }

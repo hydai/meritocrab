@@ -101,6 +101,7 @@ async fn setup_test_state() -> AppState {
         llm_evaluator,
         10,
         test_oauth_config(),
+        300,
     )
 }
 
@@ -137,6 +138,7 @@ async fn setup_test_state_with_evaluator(
         evaluator,
         10,
         test_oauth_config(),
+        300,
     )
 }
 

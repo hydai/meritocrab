@@ -61,7 +61,7 @@ async fn setup_test_state() -> AppState {
     let webhook_secret = WebhookSecret::new("test-secret".to_string());
     let repo_config = RepoConfig::default();
 
-    AppState::new(pool, github_client, repo_config, webhook_secret, llm_evaluator, 10, test_oauth_config())
+    AppState::new(pool, github_client, repo_config, webhook_secret, llm_evaluator, 10, test_oauth_config(), 300)
 }
 
 fn compute_signature(body: &[u8], secret: &str) -> String {

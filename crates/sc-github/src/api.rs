@@ -127,6 +127,60 @@ impl GithubApiClient {
             ))),
         }
     }
+
+    /// Get file content from repository
+    ///
+    /// # Arguments
+    /// * `owner` - Repository owner username
+    /// * `repo` - Repository name
+    /// * `path` - File path in repository (e.g., ".socialcredit.toml")
+    ///
+    /// # Returns
+    /// Decoded file content as UTF-8 string
+    pub async fn get_file_content(
+        &self,
+        owner: &str,
+        repo: &str,
+        path: &str,
+    ) -> GithubResult<String> {
+        // Fetch file content from GitHub
+        let content = self
+            .client
+            .repos(owner, repo)
+            .get_content()
+            .path(path)
+            .send()
+            .await
+            .map_err(|e| {
+                GithubError::ApiError(format!("Failed to fetch file {} from {}/{}: {}", path, owner, repo, e))
+            })?;
+
+        // GitHub returns content as base64-encoded
+        // Octocrab's ContentItems can be a file or directory
+        if let Some(file) = content.items.first() {
+            if let Some(encoded_content) = &file.content {
+                // Decode base64
+                let decoded = base64::Engine::decode(
+                    &base64::engine::general_purpose::STANDARD,
+                    encoded_content.replace('\n', "").as_bytes()
+                ).map_err(|e| {
+                    GithubError::ApiError(format!("Failed to decode base64 content: {}", e))
+                })?;
+
+                // Convert to UTF-8 string
+                let content_str = String::from_utf8(decoded).map_err(|e| {
+                    GithubError::ApiError(format!("Failed to decode UTF-8 content: {}", e))
+                })?;
+
+                return Ok(content_str);
+            }
+        }
+
+        Err(GithubError::ApiError(format!(
+            "File {} not found in {}/{}",
+            path, owner, repo
+        )))
+    }
 }
 
 #[cfg(test)]

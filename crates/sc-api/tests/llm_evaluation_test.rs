@@ -68,6 +68,7 @@ async fn setup_test_state_with_evaluator(evaluator: MockEvaluator) -> AppState {
         Arc::new(evaluator),
         10,
         test_oauth_config(),
+        300,
     )
 }
 
@@ -219,6 +220,7 @@ async fn test_pr_opened_low_confidence_creates_pending_evaluation() {
             Arc::new(LowConfidenceMock),
             10,
             test_oauth_config(),
+            300,
         )
     };
 

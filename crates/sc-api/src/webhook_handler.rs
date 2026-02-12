@@ -369,13 +369,34 @@ async fn process_comment_created(state: AppState, event: IssueCommentEvent) -> A
     let repo_owner = &event.repository.owner.login;
     let repo_name = &event.repository.name;
     let comment_body = &event.comment.body;
+    let issue_number = event.issue.number;
 
     info!(
         "Processing comment by {} in {}/{} on PR #{}",
-        username, repo_owner, repo_name, event.issue.number
+        username, repo_owner, repo_name, issue_number
     );
 
-    // Check if user is a maintainer/collaborator (skip credit for privileged roles)
+    // STEP 1: Check if comment contains /credit command
+    use crate::credit_commands::parse_credit_command;
+    if let Some(command) = parse_credit_command(comment_body) {
+        info!(
+            "Detected /credit command from {} in {}/{}: {:?}",
+            username, repo_owner, repo_name, command
+        );
+
+        // Process /credit command (requires maintainer role)
+        return process_credit_command(
+            state,
+            repo_owner.to_string(),
+            repo_name.to_string(),
+            username.to_string(),
+            issue_number as u64,
+            command,
+        )
+        .await;
+    }
+
+    // STEP 2: Check if user is a maintainer/collaborator (skip credit for privileged roles)
     match state
         .github_client
         .check_collaborator_role(repo_owner, repo_name, username)
@@ -399,7 +420,7 @@ async fn process_comment_created(state: AppState, event: IssueCommentEvent) -> A
         }
     }
 
-    // Lookup or create contributor
+    // STEP 3: Lookup or create contributor
     let contributor = lookup_or_create_contributor(
         &state.db_pool,
         user_id,
@@ -409,7 +430,7 @@ async fn process_comment_created(state: AppState, event: IssueCommentEvent) -> A
     )
     .await?;
 
-    // Check if blacklisted (comment stays but no credit earned)
+    // STEP 4: Check if blacklisted (comment stays but no credit earned)
     if check_blacklist(contributor.credit_score, state.repo_config.blacklist_threshold) {
         info!(
             "Contributor {} is blacklisted, skipping credit for comment",
@@ -418,7 +439,7 @@ async fn process_comment_created(state: AppState, event: IssueCommentEvent) -> A
         return Ok(());
     }
 
-    // Spawn async LLM evaluation for the comment
+    // STEP 5: Spawn async LLM evaluation for the comment
     spawn_comment_evaluation(
         state.clone(),
         contributor.id,
@@ -430,6 +451,335 @@ async fn process_comment_created(state: AppState, event: IssueCommentEvent) -> A
         event.issue.title,
     );
 
+    Ok(())
+}
+
+/// Process /credit command from maintainer
+async fn process_credit_command(
+    state: AppState,
+    repo_owner: String,
+    repo_name: String,
+    commenter_username: String,
+    issue_number: u64,
+    command: crate::credit_commands::CreditCommand,
+) -> ApiResult<()> {
+    use crate::credit_commands::CreditCommand;
+
+    // Check if commenter is a maintainer
+    let is_maintainer = match state
+        .github_client
+        .check_collaborator_role(&repo_owner, &repo_name, &commenter_username)
+        .await
+    {
+        Ok(role) if role.is_maintainer() => true,
+        Ok(_) => false,
+        Err(e) => {
+            warn!(
+                "Failed to check collaborator role for {}: {}. Treating as non-maintainer.",
+                commenter_username, e
+            );
+            false
+        }
+    };
+
+    // Non-maintainers: silently ignore command
+    if !is_maintainer {
+        info!(
+            "User {} is not a maintainer of {}/{}. Silently ignoring /credit command.",
+            commenter_username, repo_owner, repo_name
+        );
+        return Ok(());
+    }
+
+    info!(
+        "Processing /credit command from maintainer {} in {}/{}",
+        commenter_username, repo_owner, repo_name
+    );
+
+    // Process command based on type
+    match command {
+        CreditCommand::Check { username } => {
+            handle_credit_check(state, repo_owner, repo_name, issue_number, username).await
+        }
+        CreditCommand::Override { username, delta, reason } => {
+            handle_credit_override(state, repo_owner, repo_name, issue_number, username, delta, reason).await
+        }
+        CreditCommand::Blacklist { username } => {
+            handle_credit_blacklist(state, repo_owner, repo_name, issue_number, username).await
+        }
+    }
+}
+
+/// Handle /credit check @username command
+async fn handle_credit_check(
+    state: AppState,
+    repo_owner: String,
+    repo_name: String,
+    issue_number: u64,
+    target_username: String,
+) -> ApiResult<()> {
+    info!(
+        "Checking credit for {} in {}/{}",
+        target_username, repo_owner, repo_name
+    );
+
+    // Get GitHub user ID by username (we need to look up in database or use GitHub API)
+    // For simplicity, we'll try to find the contributor by username pattern
+    // This is a limitation - we should ideally query GitHub API to get user ID
+    // For now, we'll search contributors by repo and match username pattern
+
+    // Try to find contributor by matching github_user_id with expected username pattern
+    // Note: This is not ideal, but we don't have a username field in the database
+    // We'll need to query GitHub API to get the actual username for each user_id
+    // For now, we'll use a simplified approach: query by github_user_id if username is numeric
+
+    let contributor_opt = if let Ok(github_user_id) = target_username.parse::<i64>() {
+        sc_db::contributors::get_contributor(&state.db_pool, github_user_id, &repo_owner, &repo_name).await?
+    } else {
+        // We don't have username stored, so we can't look up by username
+        // Return error message
+        let response = format!(
+            "Unable to find contributor @{}. Note: Use GitHub user ID instead of username for now.",
+            target_username
+        );
+        state
+            .github_client
+            .add_comment(&repo_owner, &repo_name, issue_number, &response)
+            .await?;
+        return Ok(());
+    };
+
+    let contributor = match contributor_opt {
+        Some(c) => c,
+        None => {
+            let response = format!("Contributor @{} not found in {}/{}.", target_username, repo_owner, repo_name);
+            state
+                .github_client
+                .add_comment(&repo_owner, &repo_name, issue_number, &response)
+                .await?;
+            return Ok(());
+        }
+    };
+
+    // Get last 5 credit events
+    let events = sc_db::credit_events::list_events_by_contributor(
+        &state.db_pool,
+        contributor.id,
+        5,
+        0,
+    )
+    .await?;
+
+    // Format response
+    let mut response = format!(
+        "**Credit Report for @{}**\n\n",
+        target_username
+    );
+    response.push_str(&format!("- Credit Score: **{}**\n", contributor.credit_score));
+    response.push_str(&format!("- Role: {}\n", contributor.role.as_deref().unwrap_or("contributor")));
+    response.push_str(&format!("- Blacklisted: {}\n", if contributor.is_blacklisted { "Yes" } else { "No" }));
+    response.push_str("\n**Recent Credit History (last 5 events):**\n\n");
+
+    if events.is_empty() {
+        response.push_str("_No credit events recorded._\n");
+    } else {
+        for event in events {
+            response.push_str(&format!(
+                "- `{}`: {} ({} -> {}) — {}\n",
+                event.event_type,
+                if event.delta >= 0 { format!("+{}", event.delta) } else { event.delta.to_string() },
+                event.credit_before,
+                event.credit_after,
+                event.created_at.format("%Y-%m-%d %H:%M UTC")
+            ));
+        }
+    }
+
+    // Reply with credit report
+    state
+        .github_client
+        .add_comment(&repo_owner, &repo_name, issue_number, &response)
+        .await?;
+
+    info!("Replied with credit report for {} in {}/{}", target_username, repo_owner, repo_name);
+    Ok(())
+}
+
+/// Handle /credit override @username +10 "reason" command
+async fn handle_credit_override(
+    state: AppState,
+    repo_owner: String,
+    repo_name: String,
+    issue_number: u64,
+    target_username: String,
+    delta: i32,
+    reason: String,
+) -> ApiResult<()> {
+    info!(
+        "Overriding credit for {} in {}/{}: delta={}, reason={}",
+        target_username, repo_owner, repo_name, delta, reason
+    );
+
+    // Look up contributor (same limitation as credit check)
+    let contributor_opt = if let Ok(github_user_id) = target_username.parse::<i64>() {
+        sc_db::contributors::get_contributor(&state.db_pool, github_user_id, &repo_owner, &repo_name).await?
+    } else {
+        let response = format!(
+            "Unable to find contributor @{}. Note: Use GitHub user ID instead of username for now.",
+            target_username
+        );
+        state
+            .github_client
+            .add_comment(&repo_owner, &repo_name, issue_number, &response)
+            .await?;
+        return Ok(());
+    };
+
+    let contributor = match contributor_opt {
+        Some(c) => c,
+        None => {
+            let response = format!("Contributor @{} not found in {}/{}.", target_username, repo_owner, repo_name);
+            state
+                .github_client
+                .add_comment(&repo_owner, &repo_name, issue_number, &response)
+                .await?;
+            return Ok(());
+        }
+    };
+
+    // Apply credit adjustment
+    let credit_before = contributor.credit_score;
+    let credit_after = apply_credit(credit_before, delta);
+
+    // Update credit score
+    update_credit_score(&state.db_pool, contributor.id, credit_after).await?;
+
+    // Log credit event with maintainer override
+    insert_credit_event(
+        &state.db_pool,
+        contributor.id,
+        "manual_adjustment",
+        delta,
+        credit_before,
+        credit_after,
+        None,
+        Some(reason.clone()),
+    )
+    .await?;
+
+    info!(
+        "Applied credit override for {}: {} -> {} (delta: {})",
+        target_username, credit_before, credit_after, delta
+    );
+
+    // Check if auto-blacklist should trigger
+    if credit_after <= state.repo_config.blacklist_threshold && credit_before > state.repo_config.blacklist_threshold {
+        warn!(
+            "Auto-blacklisting user {} due to credit override (credit dropped to {})",
+            target_username, credit_after
+        );
+
+        set_blacklisted(&state.db_pool, contributor.id, true).await?;
+
+        insert_credit_event(
+            &state.db_pool,
+            contributor.id,
+            "auto_blacklist",
+            0,
+            credit_after,
+            credit_after,
+            None,
+            Some(format!("Auto-blacklisted due to credit dropping to {}", credit_after)),
+        )
+        .await?;
+    }
+
+    // Reply with confirmation
+    let response = format!(
+        "Credit adjusted for @{}: **{} → {}** (delta: {})\n\nReason: {}",
+        target_username,
+        credit_before,
+        credit_after,
+        if delta >= 0 { format!("+{}", delta) } else { delta.to_string() },
+        reason
+    );
+
+    state
+        .github_client
+        .add_comment(&repo_owner, &repo_name, issue_number, &response)
+        .await?;
+
+    info!("Replied with credit override confirmation for {} in {}/{}", target_username, repo_owner, repo_name);
+    Ok(())
+}
+
+/// Handle /credit blacklist @username command
+async fn handle_credit_blacklist(
+    state: AppState,
+    repo_owner: String,
+    repo_name: String,
+    issue_number: u64,
+    target_username: String,
+) -> ApiResult<()> {
+    info!(
+        "Blacklisting user {} in {}/{}",
+        target_username, repo_owner, repo_name
+    );
+
+    // Look up contributor (same limitation as credit check)
+    let contributor_opt = if let Ok(github_user_id) = target_username.parse::<i64>() {
+        sc_db::contributors::get_contributor(&state.db_pool, github_user_id, &repo_owner, &repo_name).await?
+    } else {
+        let response = format!(
+            "Unable to find contributor @{}. Note: Use GitHub user ID instead of username for now.",
+            target_username
+        );
+        state
+            .github_client
+            .add_comment(&repo_owner, &repo_name, issue_number, &response)
+            .await?;
+        return Ok(());
+    };
+
+    let contributor = match contributor_opt {
+        Some(c) => c,
+        None => {
+            let response = format!("Contributor @{} not found in {}/{}.", target_username, repo_owner, repo_name);
+            state
+                .github_client
+                .add_comment(&repo_owner, &repo_name, issue_number, &response)
+                .await?;
+            return Ok(());
+        }
+    };
+
+    // Set blacklist flag
+    set_blacklisted(&state.db_pool, contributor.id, true).await?;
+
+    // Log blacklist event
+    insert_credit_event(
+        &state.db_pool,
+        contributor.id,
+        "blacklist_added",
+        0,
+        contributor.credit_score,
+        contributor.credit_score,
+        None,
+        Some("Manually blacklisted by maintainer".to_string()),
+    )
+    .await?;
+
+    info!("Blacklisted user {} in {}/{}", target_username, repo_owner, repo_name);
+
+    // Reply with vague confirmation (as per spec)
+    let response = "User status updated.";
+
+    state
+        .github_client
+        .add_comment(&repo_owner, &repo_name, issue_number, &response)
+        .await?;
+
+    info!("Replied with blacklist confirmation for {} in {}/{}", target_username, repo_owner, repo_name);
     Ok(())
 }
 
@@ -710,7 +1060,7 @@ mod tests {
             redirect_url: "http://localhost:8080/auth/callback".to_string(),
         };
 
-        AppState::new(pool, github_client, repo_config, webhook_secret, llm_evaluator, 10, oauth_config)
+        AppState::new(pool, github_client, repo_config, webhook_secret, llm_evaluator, 10, oauth_config, 300)
     }
 
     fn create_mock_github_client() -> GithubApiClient {

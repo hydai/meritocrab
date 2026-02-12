@@ -143,6 +143,7 @@ async fn main() {
         llm_evaluator,
         config.max_concurrent_llm_evals,
         oauth_config,
+        300, // config cache TTL in seconds (5 minutes)
     );
 
     // Build admin API router (protected)
