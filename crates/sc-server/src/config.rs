@@ -36,6 +36,27 @@ pub struct GithubConfig {
     pub private_key_path: String,
     pub webhook_secret: String,
     pub api_url: Option<String>,
+    /// OAuth client ID for maintainer dashboard
+    #[serde(default = "default_oauth_client_id")]
+    pub oauth_client_id: String,
+    /// OAuth client secret for maintainer dashboard
+    #[serde(default = "default_oauth_client_secret")]
+    pub oauth_client_secret: String,
+    /// OAuth redirect URL
+    #[serde(default = "default_oauth_redirect_url")]
+    pub oauth_redirect_url: String,
+}
+
+fn default_oauth_client_id() -> String {
+    "".to_string()
+}
+
+fn default_oauth_client_secret() -> String {
+    "".to_string()
+}
+
+fn default_oauth_redirect_url() -> String {
+    "http://localhost:8080/auth/callback".to_string()
 }
 
 impl AppConfig {

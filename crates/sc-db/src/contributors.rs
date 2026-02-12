@@ -171,6 +171,69 @@ pub async fn set_blacklisted(
     Ok(())
 }
 
+/// List contributors by repo with pagination
+pub async fn list_contributors_by_repo(
+    pool: &Pool<Any>,
+    repo_owner: &str,
+    repo_name: &str,
+    limit: i64,
+    offset: i64,
+) -> DbResult<Vec<Contributor>> {
+    let contributors = sqlx::query_as::<_, ContributorRaw>(
+        "SELECT id, github_user_id, repo_owner, repo_name, credit_score, role, is_blacklisted, created_at, updated_at
+         FROM contributors
+         WHERE repo_owner = ? AND repo_name = ?
+         ORDER BY credit_score DESC, updated_at DESC
+         LIMIT ? OFFSET ?"
+    )
+    .bind(repo_owner)
+    .bind(repo_name)
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(|raw| raw.into())
+    .collect();
+
+    Ok(contributors)
+}
+
+/// Count total contributors for a repo
+pub async fn count_contributors_by_repo(
+    pool: &Pool<Any>,
+    repo_owner: &str,
+    repo_name: &str,
+) -> DbResult<i64> {
+    let count: (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM contributors WHERE repo_owner = ? AND repo_name = ?"
+    )
+    .bind(repo_owner)
+    .bind(repo_name)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(count.0)
+}
+
+/// Get contributor by ID
+pub async fn get_contributor_by_id(
+    pool: &Pool<Any>,
+    contributor_id: i64,
+) -> DbResult<Option<Contributor>> {
+    let contributor = sqlx::query_as::<_, ContributorRaw>(
+        "SELECT id, github_user_id, repo_owner, repo_name, credit_score, role, is_blacklisted, created_at, updated_at
+         FROM contributors
+         WHERE id = ?"
+    )
+    .bind(contributor_id)
+    .fetch_optional(pool)
+    .await?
+    .map(|raw| raw.into());
+
+    Ok(contributor)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

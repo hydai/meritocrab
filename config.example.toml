@@ -44,6 +44,16 @@ private_key_path = "./github-app-private-key.pem"
 # Generate a secure random string and configure it in your GitHub webhook settings
 webhook_secret = "your-webhook-secret-here"
 
+# OAuth Client ID for maintainer dashboard authentication
+# Create a GitHub OAuth App and get the client ID
+oauth_client_id = "your-oauth-client-id"
+
+# OAuth Client Secret for maintainer dashboard authentication
+oauth_client_secret = "your-oauth-client-secret"
+
+# OAuth Redirect URL (must match the OAuth App configuration)
+oauth_redirect_url = "http://localhost:8080/auth/callback"
+
 # GitHub API base URL (use this for GitHub Enterprise)
 # Default: "https://api.github.com"
 # api_url = "https://api.github.com"

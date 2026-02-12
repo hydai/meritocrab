@@ -1,16 +1,20 @@
 mod config;
 
 use axum::{
+    middleware,
     routing::{get, post},
     Router,
 };
 use config::AppConfig;
-use sc_api::{handle_webhook, health, AppState};
+use sc_api::{
+    admin_handlers, auth_middleware, handle_webhook, health, oauth, AppState, OAuthConfig,
+};
 use sc_db::run_migrations;
 use sc_github::{GithubApiClient, GithubAppAuth, InstallationTokenManager, WebhookSecret};
 use sc_llm::create_evaluator;
 use sqlx::any::AnyPoolOptions;
 use std::fs;
+use tower_sessions::{Expiry, MemoryStore, SessionManagerLayer};
 use tracing::{error, info};
 use tracing_subscriber;
 
@@ -118,6 +122,18 @@ async fn main() {
     };
     info!("LLM evaluator created successfully");
 
+    // Create OAuth configuration
+    let oauth_config = OAuthConfig {
+        client_id: config.github.oauth_client_id.clone(),
+        client_secret: config.github.oauth_client_secret.clone(),
+        redirect_url: config.github.oauth_redirect_url.clone(),
+    };
+
+    // Create session store (using in-memory for simplicity)
+    let session_store = MemoryStore::default();
+    let session_layer = SessionManagerLayer::new(session_store)
+        .with_expiry(Expiry::OnInactivity(time::Duration::hours(24)));
+
     // Create application state
     let app_state = AppState::new(
         db_pool,
@@ -126,12 +142,53 @@ async fn main() {
         webhook_secret,
         llm_evaluator,
         config.max_concurrent_llm_evals,
+        oauth_config,
     );
 
+    // Build admin API router (protected)
+    let admin_routes = Router::new()
+        .route(
+            "/api/repos/:owner/:repo/evaluations",
+            get(admin_handlers::list_evaluations),
+        )
+        .route(
+            "/api/repos/:owner/:repo/evaluations/:id/approve",
+            post(admin_handlers::approve_evaluation_handler),
+        )
+        .route(
+            "/api/repos/:owner/:repo/evaluations/:id/override",
+            post(admin_handlers::override_evaluation_handler),
+        )
+        .route(
+            "/api/repos/:owner/:repo/contributors",
+            get(admin_handlers::list_contributors),
+        )
+        .route(
+            "/api/repos/:owner/:repo/contributors/:user_id/adjust",
+            post(admin_handlers::adjust_contributor_credit),
+        )
+        .route(
+            "/api/repos/:owner/:repo/contributors/:user_id/blacklist",
+            post(admin_handlers::toggle_contributor_blacklist),
+        )
+        .route(
+            "/api/repos/:owner/:repo/events",
+            get(admin_handlers::list_credit_events),
+        )
+        .route_layer(middleware::from_fn_with_state(
+            app_state.clone(),
+            auth_middleware::require_maintainer,
+        ));
+
     // Build Axum router
-    let app = Router::<AppState>::new()
+    let app = Router::new()
         .route("/health", get(health))
         .route("/webhooks/github", post(handle_webhook))
+        .route("/auth/github", get(oauth::github_auth))
+        .route("/auth/callback", get(oauth::github_callback))
+        .route("/auth/logout", post(oauth::logout))
+        .merge(admin_routes)
+        .layer(session_layer)
         .with_state(app_state);
 
     // Start server

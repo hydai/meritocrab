@@ -5,7 +5,7 @@ use axum::{
     Router,
 };
 use hmac::{Hmac, Mac};
-use sc_api::{handle_webhook, health, AppState};
+use sc_api::{handle_webhook, health, AppState, OAuthConfig};
 use sc_core::RepoConfig;
 use sc_db::contributors::get_contributor;
 use sc_github::{GithubApiClient, WebhookSecret};
@@ -16,6 +16,14 @@ use std::sync::Arc;
 use tower::ServiceExt;
 
 type HmacSha256 = Hmac<Sha256>;
+
+fn test_oauth_config() -> OAuthConfig {
+    OAuthConfig {
+        client_id: "test-client-id".to_string(),
+        client_secret: "test-client-secret".to_string(),
+        redirect_url: "http://localhost:8080/auth/callback".to_string(),
+    }
+}
 
 async fn setup_test_state() -> AppState {
     // Install SQLite driver
@@ -53,7 +61,7 @@ async fn setup_test_state() -> AppState {
     let webhook_secret = WebhookSecret::new("test-secret".to_string());
     let repo_config = RepoConfig::default();
 
-    AppState::new(pool, github_client, repo_config, webhook_secret, llm_evaluator, 10)
+    AppState::new(pool, github_client, repo_config, webhook_secret, llm_evaluator, 10, test_oauth_config())
 }
 
 fn compute_signature(body: &[u8], secret: &str) -> String {

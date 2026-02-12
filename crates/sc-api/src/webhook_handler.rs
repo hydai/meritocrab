@@ -704,7 +704,13 @@ mod tests {
         let webhook_secret = WebhookSecret::new("test-secret".to_string());
         let repo_config = RepoConfig::default();
 
-        AppState::new(pool, github_client, repo_config, webhook_secret, llm_evaluator, 10)
+        let oauth_config = crate::OAuthConfig {
+            client_id: "test-client-id".to_string(),
+            client_secret: "test-client-secret".to_string(),
+            redirect_url: "http://localhost:8080/auth/callback".to_string(),
+        };
+
+        AppState::new(pool, github_client, repo_config, webhook_secret, llm_evaluator, 10, oauth_config)
     }
 
     fn create_mock_github_client() -> GithubApiClient {

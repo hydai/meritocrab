@@ -1,4 +1,4 @@
-use sc_api::state::AppState;
+use sc_api::{state::AppState, OAuthConfig};
 use sc_core::{config::QualityLevel, RepoConfig};
 use sc_db::{
     contributors::{create_contributor, get_contributor, set_blacklisted},
@@ -9,6 +9,14 @@ use sc_llm::Evaluation;
 use sqlx::any::AnyPoolOptions;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+
+fn test_oauth_config() -> OAuthConfig {
+    OAuthConfig {
+        client_id: "test-client-id".to_string(),
+        client_secret: "test-client-secret".to_string(),
+        redirect_url: "http://localhost:8080/auth/callback".to_string(),
+    }
+}
 
 /// Custom mock evaluator that returns spam to trigger credit deduction
 struct SpamEvaluator;
@@ -92,6 +100,7 @@ async fn setup_test_state() -> AppState {
         webhook_secret,
         llm_evaluator,
         10,
+        test_oauth_config(),
     )
 }
 
@@ -127,6 +136,7 @@ async fn setup_test_state_with_evaluator(
         webhook_secret,
         evaluator,
         10,
+        test_oauth_config(),
     )
 }
 

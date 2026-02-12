@@ -89,6 +89,98 @@ pub async fn count_events_by_contributor(
     Ok(count.0)
 }
 
+/// List credit events by repo with optional filters (contributor_id, event_type)
+pub async fn list_events_by_repo(
+    pool: &Pool<Any>,
+    repo_owner: &str,
+    repo_name: &str,
+    contributor_id: Option<i64>,
+    event_type: Option<&str>,
+    limit: i64,
+    offset: i64,
+) -> DbResult<Vec<CreditEvent>> {
+    // Build dynamic query based on filters
+    let mut query = String::from(
+        "SELECT ce.id, ce.contributor_id, ce.event_type, ce.delta, ce.credit_before, ce.credit_after,
+                ce.llm_evaluation, ce.maintainer_override, ce.created_at
+         FROM credit_events ce
+         JOIN contributors c ON ce.contributor_id = c.id
+         WHERE c.repo_owner = ? AND c.repo_name = ?"
+    );
+
+    if contributor_id.is_some() {
+        query.push_str(" AND ce.contributor_id = ?");
+    }
+
+    if event_type.is_some() {
+        query.push_str(" AND ce.event_type = ?");
+    }
+
+    query.push_str(" ORDER BY ce.created_at DESC LIMIT ? OFFSET ?");
+
+    let mut q = sqlx::query_as::<_, CreditEventRaw>(&query)
+        .bind(repo_owner)
+        .bind(repo_name);
+
+    if let Some(cid) = contributor_id {
+        q = q.bind(cid);
+    }
+
+    if let Some(et) = event_type {
+        q = q.bind(et);
+    }
+
+    let events = q
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(pool)
+        .await?
+        .into_iter()
+        .map(|raw| raw.into())
+        .collect();
+
+    Ok(events)
+}
+
+/// Count total events for a repo with optional filters
+pub async fn count_events_by_repo(
+    pool: &Pool<Any>,
+    repo_owner: &str,
+    repo_name: &str,
+    contributor_id: Option<i64>,
+    event_type: Option<&str>,
+) -> DbResult<i64> {
+    let mut query = String::from(
+        "SELECT COUNT(*) FROM credit_events ce
+         JOIN contributors c ON ce.contributor_id = c.id
+         WHERE c.repo_owner = ? AND c.repo_name = ?"
+    );
+
+    if contributor_id.is_some() {
+        query.push_str(" AND ce.contributor_id = ?");
+    }
+
+    if event_type.is_some() {
+        query.push_str(" AND ce.event_type = ?");
+    }
+
+    let mut q = sqlx::query_as::<_, (i64,)>(&query)
+        .bind(repo_owner)
+        .bind(repo_name);
+
+    if let Some(cid) = contributor_id {
+        q = q.bind(cid);
+    }
+
+    if let Some(et) = event_type {
+        q = q.bind(et);
+    }
+
+    let count = q.fetch_one(pool).await?;
+
+    Ok(count.0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

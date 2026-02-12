@@ -5,7 +5,7 @@ use axum::{
     Router,
 };
 use hmac::{Hmac, Mac};
-use sc_api::{handle_webhook, health, AppState};
+use sc_api::{handle_webhook, health, AppState, OAuthConfig};
 use sc_core::{QualityLevel, RepoConfig};
 use sc_db::{contributors::get_contributor, credit_events::list_events_by_contributor, evaluations::list_evaluations_by_repo_and_status};
 use sc_github::{GithubApiClient, WebhookSecret};
@@ -16,6 +16,14 @@ use sqlx::any::AnyPoolOptions;
 use std::sync::Arc;
 use tokio::time::{sleep, Duration};
 use tower::ServiceExt;
+
+fn test_oauth_config() -> OAuthConfig {
+    OAuthConfig {
+        client_id: "test-client-id".to_string(),
+        client_secret: "test-client-secret".to_string(),
+        redirect_url: "http://localhost:8080/auth/callback".to_string(),
+    }
+}
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -59,6 +67,7 @@ async fn setup_test_state_with_evaluator(evaluator: MockEvaluator) -> AppState {
         webhook_secret,
         Arc::new(evaluator),
         10,
+        test_oauth_config(),
     )
 }
 
@@ -209,6 +218,7 @@ async fn test_pr_opened_low_confidence_creates_pending_evaluation() {
             webhook_secret,
             Arc::new(LowConfidenceMock),
             10,
+            test_oauth_config(),
         )
     };
 

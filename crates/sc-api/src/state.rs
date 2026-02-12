@@ -2,9 +2,18 @@ use axum::extract::FromRef;
 use sc_core::RepoConfig;
 use sc_github::{GithubApiClient, WebhookSecret};
 use sc_llm::LlmEvaluator;
+use serde::{Deserialize, Serialize};
 use sqlx::{Any, Pool};
 use std::sync::Arc;
 use tokio::sync::Semaphore;
+
+/// OAuth configuration
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct OAuthConfig {
+    pub client_id: String,
+    pub client_secret: String,
+    pub redirect_url: String,
+}
 
 /// Application state for Axum dependency injection
 ///
@@ -15,6 +24,7 @@ use tokio::sync::Semaphore;
 /// - Webhook secret for HMAC verification
 /// - LLM evaluator for content quality assessment
 /// - Semaphore for limiting concurrent LLM evaluations
+/// - OAuth configuration for admin authentication
 #[derive(Clone)]
 pub struct AppState {
     /// Database connection pool
@@ -34,6 +44,9 @@ pub struct AppState {
 
     /// Semaphore for limiting concurrent LLM evaluations
     pub llm_semaphore: Arc<Semaphore>,
+
+    /// OAuth configuration for admin authentication
+    pub oauth_config: OAuthConfig,
 }
 
 impl AppState {
@@ -45,6 +58,7 @@ impl AppState {
         webhook_secret: WebhookSecret,
         llm_evaluator: Arc<dyn LlmEvaluator>,
         max_concurrent_llm_evals: usize,
+        oauth_config: OAuthConfig,
     ) -> Self {
         Self {
             db_pool,
@@ -53,6 +67,7 @@ impl AppState {
             webhook_secret,
             llm_evaluator,
             llm_semaphore: Arc::new(Semaphore::new(max_concurrent_llm_evals)),
+            oauth_config,
         }
     }
 }
@@ -61,5 +76,19 @@ impl AppState {
 impl FromRef<AppState> for WebhookSecret {
     fn from_ref(state: &AppState) -> Self {
         state.webhook_secret.clone()
+    }
+}
+
+/// Implement FromRef to allow OAuth handlers to access OAuthConfig
+impl FromRef<AppState> for OAuthConfig {
+    fn from_ref(state: &AppState) -> Self {
+        state.oauth_config.clone()
+    }
+}
+
+/// Implement FromRef to allow auth middleware to access GithubApiClient
+impl FromRef<AppState> for Arc<GithubApiClient> {
+    fn from_ref(state: &AppState) -> Self {
+        state.github_client.clone()
     }
 }

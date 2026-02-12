@@ -29,6 +29,21 @@ pub enum ApiError {
 
     /// Internal server error
     Internal(String),
+
+    /// Unauthorized (401)
+    Unauthorized(String),
+
+    /// Not found (404)
+    NotFound(String),
+
+    /// Bad request (400)
+    BadRequest(String),
+
+    /// Forbidden (403)
+    Forbidden(String),
+
+    /// Internal error (alias for backward compatibility)
+    InternalError(String),
 }
 
 impl fmt::Display for ApiError {
@@ -40,6 +55,11 @@ impl fmt::Display for ApiError {
             ApiError::InvalidPayload(msg) => write!(f, "Invalid payload: {}", msg),
             ApiError::InvalidSignature(msg) => write!(f, "Invalid signature: {}", msg),
             ApiError::Internal(msg) => write!(f, "Internal error: {}", msg),
+            ApiError::Unauthorized(msg) => write!(f, "Unauthorized: {}", msg),
+            ApiError::NotFound(msg) => write!(f, "Not found: {}", msg),
+            ApiError::BadRequest(msg) => write!(f, "Bad request: {}", msg),
+            ApiError::Forbidden(msg) => write!(f, "Forbidden: {}", msg),
+            ApiError::InternalError(msg) => write!(f, "Internal error: {}", msg),
         }
     }
 }
@@ -81,9 +101,29 @@ impl IntoResponse for ApiError {
                 "invalid_signature",
                 msg.clone(),
             ),
-            ApiError::Internal(msg) => (
+            ApiError::Internal(msg) | ApiError::InternalError(msg) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "internal_error",
+                msg.clone(),
+            ),
+            ApiError::Unauthorized(msg) => (
+                StatusCode::UNAUTHORIZED,
+                "unauthorized",
+                msg.clone(),
+            ),
+            ApiError::NotFound(msg) => (
+                StatusCode::NOT_FOUND,
+                "not_found",
+                msg.clone(),
+            ),
+            ApiError::BadRequest(msg) => (
+                StatusCode::BAD_REQUEST,
+                "bad_request",
+                msg.clone(),
+            ),
+            ApiError::Forbidden(msg) => (
+                StatusCode::FORBIDDEN,
+                "forbidden",
                 msg.clone(),
             ),
         };
