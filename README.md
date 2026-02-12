@@ -1,4 +1,7 @@
-# Open Source Meritocrab System
+# Meritocrab
+
+[![crates.io](https://img.shields.io/crates/v/meritocrab.svg)](https://crates.io/crates/meritocrab)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 A reputation/credit system for open source repositories that grades contributors based on contribution quality using LLM evaluation. The system gates PR submissions behind a credit threshold and provides tools for maintainers to manage contributor reputation.
 
@@ -12,6 +15,27 @@ A reputation/credit system for open source repositories that grades contributors
 - **Flexible Configuration**: Per-repository custom scoring via `.meritocrab.toml`
 - **Role-Based Bypass**: Maintainers and collaborators exempt from checks
 - **Audit Trail**: Complete history of all credit changes with maintainer overrides
+
+## Installation
+
+### As a library
+
+```toml
+# Use the facade crate for everything
+[dependencies]
+meritocrab = "0.1"
+
+# Or depend on individual crates
+[dependencies]
+meritocrab-core = "0.1"
+meritocrab-llm = "0.1"
+```
+
+### As a server
+
+```bash
+cargo install meritocrab-server
+```
 
 ## Architecture
 
@@ -52,7 +76,7 @@ GitHub Webhooks (PR, Comment, Review)
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/yourusername/meritocrab.git
+   git clone https://github.com/hydai/meritocrab.git
    cd meritocrab
    ```
 
@@ -228,28 +252,11 @@ Immediately blacklists contributor. Future PRs will be shadow-closed.
 
 ### Workflow
 
-1. **PR Opened**: Check credit >= threshold → If insufficient, close PR with message
+1. **PR Opened**: Check credit >= threshold -> If insufficient, close PR with message
 2. **LLM Evaluation**: Async evaluation of content quality
 3. **Credit Adjustment**: Apply delta if confidence >= 0.85, else queue for maintainer review
 4. **Auto-Blacklist**: If credit <= blacklist_threshold, auto-blacklist contributor
 5. **Shadow Enforcement**: Blacklisted PRs closed after randomized delay (30-120s)
-
-## Database Schema
-
-### Tables
-
-- **contributors**: Per-user per-repo credit tracking
-- **credit_events**: Immutable audit log of all credit changes
-- **pending_evaluations**: Maintainer review queue for low-confidence evaluations
-- **repo_configs**: Cached per-repository configuration
-
-### Migrations
-
-Migrations are automatically applied on server startup. Manual migration:
-
-```bash
-sqlx migrate run --database-url "your-database-url"
-```
 
 ## Development
 
@@ -270,18 +277,36 @@ cargo test -- --nocapture
 
 ```
 meritocrab/
-├── Cargo.toml                 # Workspace root
+├── Cargo.toml                 # Workspace root + meritocrab facade crate
+├── src/lib.rs                 # Facade: re-exports all sub-crates
+├── LICENSE                    # MIT
 ├── Dockerfile                 # Multi-stage production build
 ├── docker-compose.yml         # Server + PostgreSQL
-├── config.toml                # Server configuration
-├── .meritocrab.toml.example # Per-repo config example
+├── config.example.toml        # Server configuration template
+├── .meritocrab.toml.example   # Per-repo config example
 └── crates/
-    ├── meritocrab-server/     # Entry point, HTTP server setup
-    ├── meritocrab-core/       # Credit scoring (pure functions)
+    ├── meritocrab-core/       # Credit scoring (pure functions, no I/O)
     ├── meritocrab-github/     # GitHub API + webhook verification
     ├── meritocrab-llm/        # LLM evaluator trait + implementations
     ├── meritocrab-db/         # Database layer + migrations
-    └── meritocrab-api/        # HTTP handlers + middleware
+    ├── meritocrab-api/        # HTTP handlers + middleware
+    └── meritocrab-server/     # Entry point, HTTP server setup
+```
+
+### Crate Dependency Graph
+
+```
+meritocrab-core       meritocrab-github     (leaf crates, no internal deps)
+      |                     |
+      +-------+-------+     |
+              |       |     |
+       meritocrab-db  meritocrab-llm
+              |       |     |
+              +---+---+-----+
+                  |
+           meritocrab-api
+                  |
+           meritocrab-server (binary)
 ```
 
 ### Adding a New LLM Provider
@@ -337,12 +362,6 @@ The server handles SIGTERM gracefully:
 3. Flush pending LLM evaluations to database
 4. Close database connections
 
-### Rate Limiting
-
-For production deployments, implement rate limiting at the reverse proxy level (nginx, HAProxy) or API gateway level (AWS API Gateway, Kong). The webhook endpoint receives rate limiting naturally from GitHub's webhook delivery mechanism.
-
-Admin endpoints are protected by GitHub OAuth authentication which provides basic DoS protection.
-
 ## Monitoring
 
 ### Logs
@@ -360,14 +379,6 @@ Configure log level via `RUST_LOG` environment variable:
 RUST_LOG=info cargo run
 RUST_LOG=debug,sqlx=warn cargo run  # Debug app, warn for sqlx
 ```
-
-### Metrics
-
-For production monitoring, consider integrating:
-
-- Prometheus for metrics collection
-- Grafana for visualization
-- Application-level metrics: request latency, LLM evaluation time, credit score distribution
 
 ## Troubleshooting
 
@@ -390,15 +401,6 @@ Increase semaphore limit in config:
 max_concurrent_llm_evals = 10  # Default: 5
 ```
 
-### Database connection pool exhausted
-
-Increase max connections in config:
-
-```toml
-[database]
-max_connections = 20  # Default: 10
-```
-
 ## Security Considerations
 
 - **Webhook Verification**: All webhooks verified with HMAC-SHA256
@@ -417,13 +419,11 @@ max_connections = 20  # Default: 10
 
 ## License
 
-MIT License - See LICENSE file for details
+MIT License - See [LICENSE](LICENSE) file for details.
 
 ## Support
 
-For issues and questions:
-- GitHub Issues: https://github.com/yourusername/meritocrab/issues
-- Documentation: https://github.com/yourusername/meritocrab/wiki
+- GitHub Issues: https://github.com/hydai/meritocrab/issues
 
 ## Acknowledgments
 
