@@ -1,0 +1,22 @@
+# Rust build artifacts
+/target/
+
+# Development environment
+.DS_Store
+.vscode/
+.idea/
+
+# Configuration (use config.example.toml as template)
+config.toml
+
+# Secrets
+*.pem
+*.key
+
+# Database
+*.db
+*.db-shm
+*.db-wal
+
+# Logs
+*.log
