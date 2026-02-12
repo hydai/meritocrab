@@ -194,6 +194,10 @@ async fn test_pr_opened_low_confidence_creates_pending_evaluation() {
                 "Uncertain evaluation".to_string(),
             ))
         }
+
+        fn provider_name(&self) -> String {
+            "low_confidence_mock".to_string()
+        }
     }
 
     let state = {

@@ -7,7 +7,8 @@ use axum::{
 };
 use config::AppConfig;
 use sc_api::{
-    admin_handlers, auth_middleware, handle_webhook, health, oauth, AppState, OAuthConfig,
+    admin_handlers, auth_middleware, handle_webhook, health, init_server_start_time, oauth,
+    AppState, OAuthConfig,
 };
 use sc_db::run_migrations;
 use sc_github::{GithubApiClient, GithubAppAuth, InstallationTokenManager, WebhookSecret};
@@ -22,6 +23,9 @@ use tracing_subscriber;
 async fn main() {
     // Initialize tracing
     tracing_subscriber::fmt::init();
+
+    // Initialize server start time for health endpoint
+    init_server_start_time();
 
     // Install SQLite driver for sqlx::Any
     sqlx::any::install_default_drivers();
@@ -204,9 +208,42 @@ async fn main() {
 
     info!("Server listening on http://{}", addr);
 
-    // Run server
-    if let Err(e) = axum::serve(listener, app).await {
-        error!("Server error: {}", e);
-        std::process::exit(1);
+    // Run server with graceful shutdown
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await
+        .expect("Server error");
+
+    info!("Server shutdown complete");
+}
+
+/// Wait for SIGTERM signal for graceful shutdown
+async fn shutdown_signal() {
+    use tokio::signal;
+
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("Failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("Failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {
+            info!("Received SIGINT (Ctrl+C), initiating graceful shutdown...");
+        },
+        _ = terminate => {
+            info!("Received SIGTERM, initiating graceful shutdown...");
+        },
     }
 }

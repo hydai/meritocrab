@@ -34,6 +34,10 @@ impl sc_llm::LlmEvaluator for SpamEvaluator {
             reasoning: "Spam content detected".to_string(),
         })
     }
+
+    fn provider_name(&self) -> String {
+        "test_spam".to_string()
+    }
 }
 
 /// Custom mock evaluator that tracks evaluation calls
@@ -66,6 +70,10 @@ impl sc_llm::LlmEvaluator for TrackingEvaluator {
             confidence: 0.95,
             reasoning: "High quality content".to_string(),
         })
+    }
+
+    fn provider_name(&self) -> String {
+        "test_tracking".to_string()
     }
 }
 

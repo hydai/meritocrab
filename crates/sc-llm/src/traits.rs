@@ -53,6 +53,9 @@ impl Evaluation {
 pub trait LlmEvaluator: Send + Sync {
     /// Evaluate content and return quality classification with confidence
     async fn evaluate(&self, content: &str, context: &EvalContext) -> Result<Evaluation, LlmError>;
+
+    /// Get the provider name (e.g., "claude", "openai", "mock")
+    fn provider_name(&self) -> String;
 }
 
 /// Errors that can occur during LLM evaluation

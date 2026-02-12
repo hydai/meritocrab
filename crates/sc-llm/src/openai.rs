@@ -168,6 +168,10 @@ impl LlmEvaluator for OpenAiEvaluator {
             llm_response.reasoning,
         ))
     }
+
+    fn provider_name(&self) -> String {
+        "openai".to_string()
+    }
 }
 
 #[cfg(test)]

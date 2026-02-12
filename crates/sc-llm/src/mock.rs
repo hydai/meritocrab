@@ -103,6 +103,10 @@ impl LlmEvaluator for MockEvaluator {
         let (classification, confidence, reasoning) = self.classify_by_keywords(content);
         Ok(Evaluation::new(classification, confidence, reasoning))
     }
+
+    fn provider_name(&self) -> String {
+        "mock".to_string()
+    }
 }
 
 #[cfg(test)]

@@ -157,6 +157,10 @@ impl LlmEvaluator for ClaudeEvaluator {
             llm_response.reasoning,
         ))
     }
+
+    fn provider_name(&self) -> String {
+        "claude".to_string()
+    }
 }
 
 #[cfg(test)]
