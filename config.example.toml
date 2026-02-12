@@ -1,0 +1,157 @@
+# Social Credit System Configuration Example
+# Copy this file to `config.toml` and customize for your deployment
+
+# ============================================================================
+# Server Configuration
+# ============================================================================
+[server]
+# Host address to bind the server to
+# Use "0.0.0.0" to accept connections from any network interface
+# Use "127.0.0.1" for localhost-only access
+host = "127.0.0.1"
+
+# Port number for the HTTP server
+port = 8080
+
+# ============================================================================
+# Database Configuration
+# ============================================================================
+[database]
+# Database connection URL
+# For SQLite (development):
+#   url = "sqlite://socialcredit.db"
+# For PostgreSQL (production):
+#   url = "postgres://user:password@localhost/socialcredit"
+url = "sqlite://socialcredit.db"
+
+# Maximum number of database connections in the pool
+max_connections = 10
+
+# ============================================================================
+# GitHub Configuration
+# ============================================================================
+[github]
+# GitHub App ID (required for GitHub App authentication)
+app_id = 123456
+
+# GitHub App installation ID (required for accessing repositories)
+installation_id = 789012
+
+# Path to GitHub App private key file (PEM format)
+private_key_path = "./github-app-private-key.pem"
+
+# Webhook secret for HMAC-SHA256 signature verification
+# Generate a secure random string and configure it in your GitHub webhook settings
+webhook_secret = "your-webhook-secret-here"
+
+# GitHub API base URL (use this for GitHub Enterprise)
+# Default: "https://api.github.com"
+# api_url = "https://api.github.com"
+
+# ============================================================================
+# LLM Configuration
+# ============================================================================
+[llm]
+# LLM provider: "claude" or "openai"
+provider = "claude"
+
+# API key for the selected LLM provider
+api_key = "your-api-key-here"
+
+# Model to use for evaluations
+# For Claude: "claude-3-5-sonnet-20241022", "claude-3-opus-20240229", etc.
+# For OpenAI: "gpt-4-turbo-preview", "gpt-3.5-turbo", etc.
+model = "claude-3-5-sonnet-20241022"
+
+# Confidence threshold for auto-applying LLM evaluations (0.0 to 1.0)
+# Evaluations with confidence >= this threshold are auto-applied
+# Lower values mean more evaluations are auto-applied (less maintainer review)
+# Higher values mean more evaluations require maintainer review
+confidence_threshold = 0.85
+
+# Maximum number of concurrent LLM evaluation requests
+# Prevents rate limiting and controls resource usage
+max_concurrent_evaluations = 5
+
+# Request timeout in seconds
+timeout_seconds = 30
+
+# ============================================================================
+# Credit Scoring Configuration (Default Repository Settings)
+# ============================================================================
+# Individual repositories can override these settings via .socialcredit.toml
+
+[credit]
+# Starting credit for new contributors
+starting_credit = 100
+
+# Minimum credit required to open pull requests
+# Contributors with credit below this threshold will have PRs auto-closed
+pr_threshold = 50
+
+# Credit level at which auto-blacklist triggers
+# Contributors at or below this level are shadow-blacklisted
+blacklist_threshold = 0
+
+# Scoring deltas for PR opened events
+[credit.pr_opened]
+spam = -25          # Spam PRs (e.g., promotional links, nonsense)
+low = -5            # Low quality PRs (e.g., trivial changes, poor quality)
+acceptable = 5      # Acceptable PRs (e.g., valid contributions)
+high = 15           # High quality PRs (e.g., well-documented, significant value)
+
+# Scoring deltas for comment events
+[credit.comment]
+spam = -10          # Spam comments (e.g., promotional, off-topic)
+low = -2            # Low quality comments (e.g., unhelpful, superficial)
+acceptable = 1      # Acceptable comments (e.g., valid feedback)
+high = 3            # High quality comments (e.g., insightful, constructive)
+
+# Scoring deltas for PR merged events
+[credit.pr_merged]
+spam = 0            # Merged PRs are always positive contributions
+low = 0
+acceptable = 20     # Standard merged PR bonus
+high = 20
+
+# Scoring deltas for review submitted events
+[credit.review_submitted]
+spam = 0            # Reviews are always positive contributions
+low = 0
+acceptable = 5      # Standard review bonus
+high = 5
+
+# ============================================================================
+# Shadow Blacklist Configuration
+# ============================================================================
+[blacklist]
+# Minimum delay in seconds before closing blacklisted PRs
+# Randomized to appear organic (not automated)
+min_delay_seconds = 30
+
+# Maximum delay in seconds before closing blacklisted PRs
+max_delay_seconds = 120
+
+# Generic message to use when closing blacklisted PRs
+# Should not reveal blacklist status
+close_message = "Thank you for your contribution. After review, we've determined this PR doesn't align with the project's current direction. Please feel free to engage with the community and try again."
+
+# ============================================================================
+# Logging Configuration
+# ============================================================================
+[logging]
+# Log level: "trace", "debug", "info", "warn", "error"
+level = "info"
+
+# Log format: "json" or "pretty"
+format = "pretty"
+
+# ============================================================================
+# Rate Limiting Configuration
+# ============================================================================
+[rate_limit]
+# Enable rate limiting for webhook endpoints
+enabled = true
+
+# Maximum requests per IP per minute
+requests_per_minute = 60
