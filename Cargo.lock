@@ -1499,6 +1499,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8ca58f447f06ed17d5fc4043ce1b10dd205e060fb3ce5b979b8ed8e59ff3f79"
 
 [[package]]
+name = "meritocrab"
+version = "0.1.0"
+dependencies = [
+ "meritocrab-api",
+ "meritocrab-core",
+ "meritocrab-db",
+ "meritocrab-github",
+ "meritocrab-llm",
+]
+
+[[package]]
 name = "meritocrab-api"
 version = "0.1.0"
 dependencies = [

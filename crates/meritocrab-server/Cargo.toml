@@ -1,15 +1,19 @@
 [package]
 name = "meritocrab-server"
+description = "Server binary for the Meritocrab reputation system"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
 
 [dependencies]
-meritocrab-api = { path = "../meritocrab-api" }
-meritocrab-core = { path = "../meritocrab-core" }
-meritocrab-db = { path = "../meritocrab-db" }
-meritocrab-github = { path = "../meritocrab-github" }
-meritocrab-llm = { path = "../meritocrab-llm" }
+meritocrab-api = { path = "../meritocrab-api", version = "0.1.0" }
+meritocrab-core = { path = "../meritocrab-core", version = "0.1.0" }
+meritocrab-db = { path = "../meritocrab-db", version = "0.1.0" }
+meritocrab-github = { path = "../meritocrab-github", version = "0.1.0" }
+meritocrab-llm = { path = "../meritocrab-llm", version = "0.1.0" }
 
 axum = { workspace = true }
 config = { workspace = true }
