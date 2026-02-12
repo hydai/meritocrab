@@ -8,6 +8,7 @@ use config::AppConfig;
 use sc_api::{handle_webhook, health, AppState};
 use sc_db::run_migrations;
 use sc_github::{GithubApiClient, GithubAppAuth, InstallationTokenManager, WebhookSecret};
+use sc_llm::create_evaluator;
 use sqlx::any::AnyPoolOptions;
 use std::fs;
 use tracing::{error, info};
@@ -107,8 +108,25 @@ async fn main() {
     // Create webhook secret
     let webhook_secret = WebhookSecret::new(config.github.webhook_secret.clone());
 
+    // Create LLM evaluator
+    let llm_evaluator = match create_evaluator(&config.llm) {
+        Ok(evaluator) => evaluator,
+        Err(e) => {
+            error!("Failed to create LLM evaluator: {}", e);
+            std::process::exit(1);
+        }
+    };
+    info!("LLM evaluator created successfully");
+
     // Create application state
-    let app_state = AppState::new(db_pool, github_client, config.credit, webhook_secret);
+    let app_state = AppState::new(
+        db_pool,
+        github_client,
+        config.credit,
+        webhook_secret,
+        llm_evaluator,
+        config.max_concurrent_llm_evals,
+    );
 
     // Build Axum router
     let app = Router::<AppState>::new()

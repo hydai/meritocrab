@@ -8,8 +8,10 @@ rust-version.workspace = true
 sc-core = { path = "../sc-core" }
 sc-db = { path = "../sc-db" }
 sc-github = { path = "../sc-github" }
+sc-llm = { path = "../sc-llm" }
 
 axum = { workspace = true }
+chrono = { workspace = true }
 hex = { workspace = true }
 hmac = { workspace = true }
 serde = { workspace = true }
@@ -21,5 +23,6 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
+async-trait = { workspace = true }
 rustls = { version = "0.23", features = ["aws-lc-rs"], default-features = false }
 tower = { workspace = true }

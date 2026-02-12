@@ -51,30 +51,35 @@ webhook_secret = "your-webhook-secret-here"
 # ============================================================================
 # LLM Configuration
 # ============================================================================
+# LLM provider configuration for content quality evaluation
+# Three options: "mock" (for testing), "claude", or "openai"
+
+# Option 1: Mock evaluator (for development and testing)
 [llm]
-# LLM provider: "claude" or "openai"
-provider = "claude"
+provider = "mock"
+# Optional: set default classification for all evaluations
+# default_classification = "high"
 
-# API key for the selected LLM provider
-api_key = "your-api-key-here"
+# Option 2: Claude AI (production)
+# [llm]
+# provider = "claude"
+# api_key = "your-claude-api-key-here"
+# model = "claude-3-5-sonnet-20241022"
+# # Optional: custom API endpoint
+# # base_url = "https://api.anthropic.com"
 
-# Model to use for evaluations
-# For Claude: "claude-3-5-sonnet-20241022", "claude-3-opus-20240229", etc.
-# For OpenAI: "gpt-4-turbo-preview", "gpt-3.5-turbo", etc.
-model = "claude-3-5-sonnet-20241022"
-
-# Confidence threshold for auto-applying LLM evaluations (0.0 to 1.0)
-# Evaluations with confidence >= this threshold are auto-applied
-# Lower values mean more evaluations are auto-applied (less maintainer review)
-# Higher values mean more evaluations require maintainer review
-confidence_threshold = 0.85
+# Option 3: OpenAI (production)
+# [llm]
+# provider = "openai"
+# api_key = "your-openai-api-key-here"
+# model = "gpt-4o"
+# # Optional: custom API endpoint
+# # base_url = "https://api.openai.com"
 
 # Maximum number of concurrent LLM evaluation requests
 # Prevents rate limiting and controls resource usage
-max_concurrent_evaluations = 5
-
-# Request timeout in seconds
-timeout_seconds = 30
+# Default: 10
+max_concurrent_llm_evals = 10
 
 # ============================================================================
 # Credit Scoring Configuration (Default Repository Settings)
@@ -120,38 +125,3 @@ spam = 0            # Reviews are always positive contributions
 low = 0
 acceptable = 5      # Standard review bonus
 high = 5
-
-# ============================================================================
-# Shadow Blacklist Configuration
-# ============================================================================
-[blacklist]
-# Minimum delay in seconds before closing blacklisted PRs
-# Randomized to appear organic (not automated)
-min_delay_seconds = 30
-
-# Maximum delay in seconds before closing blacklisted PRs
-max_delay_seconds = 120
-
-# Generic message to use when closing blacklisted PRs
-# Should not reveal blacklist status
-close_message = "Thank you for your contribution. After review, we've determined this PR doesn't align with the project's current direction. Please feel free to engage with the community and try again."
-
-# ============================================================================
-# Logging Configuration
-# ============================================================================
-[logging]
-# Log level: "trace", "debug", "info", "warn", "error"
-level = "info"
-
-# Log format: "json" or "pretty"
-format = "pretty"
-
-# ============================================================================
-# Rate Limiting Configuration
-# ============================================================================
-[rate_limit]
-# Enable rate limiting for webhook endpoints
-enabled = true
-
-# Maximum requests per IP per minute
-requests_per_minute = 60

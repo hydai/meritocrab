@@ -1,8 +1,10 @@
 use axum::extract::FromRef;
 use sc_core::RepoConfig;
 use sc_github::{GithubApiClient, WebhookSecret};
+use sc_llm::LlmEvaluator;
 use sqlx::{Any, Pool};
 use std::sync::Arc;
+use tokio::sync::Semaphore;
 
 /// Application state for Axum dependency injection
 ///
@@ -11,6 +13,8 @@ use std::sync::Arc;
 /// - GitHub API client
 /// - Repository configuration
 /// - Webhook secret for HMAC verification
+/// - LLM evaluator for content quality assessment
+/// - Semaphore for limiting concurrent LLM evaluations
 #[derive(Clone)]
 pub struct AppState {
     /// Database connection pool
@@ -24,6 +28,12 @@ pub struct AppState {
 
     /// Webhook secret for HMAC verification
     pub webhook_secret: WebhookSecret,
+
+    /// LLM evaluator for content quality assessment
+    pub llm_evaluator: Arc<dyn LlmEvaluator>,
+
+    /// Semaphore for limiting concurrent LLM evaluations
+    pub llm_semaphore: Arc<Semaphore>,
 }
 
 impl AppState {
@@ -33,12 +43,16 @@ impl AppState {
         github_client: GithubApiClient,
         repo_config: RepoConfig,
         webhook_secret: WebhookSecret,
+        llm_evaluator: Arc<dyn LlmEvaluator>,
+        max_concurrent_llm_evals: usize,
     ) -> Self {
         Self {
             db_pool,
             github_client: Arc::new(github_client),
             repo_config,
             webhook_secret,
+            llm_evaluator,
+            llm_semaphore: Arc::new(Semaphore::new(max_concurrent_llm_evals)),
         }
     }
 }

@@ -9,6 +9,7 @@ sc-api = { path = "../sc-api" }
 sc-core = { path = "../sc-core" }
 sc-db = { path = "../sc-db" }
 sc-github = { path = "../sc-github" }
+sc-llm = { path = "../sc-llm" }
 
 axum = { workspace = true }
 config = { workspace = true }

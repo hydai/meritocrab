@@ -1,5 +1,6 @@
 use config::{Config, ConfigError, Environment, File};
 use sc_core::{RepoConfig, ServerConfig};
+use sc_llm::LlmConfig;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -10,6 +11,14 @@ pub struct AppConfig {
     pub database: DatabaseConfig,
     pub github: GithubConfig,
     pub credit: RepoConfig,
+    #[serde(default)]
+    pub llm: LlmConfig,
+    #[serde(default = "default_max_concurrent_llm_evals")]
+    pub max_concurrent_llm_evals: usize,
+}
+
+fn default_max_concurrent_llm_evals() -> usize {
+    10
 }
 
 /// Database configuration

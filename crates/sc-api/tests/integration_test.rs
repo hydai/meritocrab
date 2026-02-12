@@ -12,6 +12,7 @@ use sc_github::{GithubApiClient, WebhookSecret};
 use serde_json::json;
 use sha2::Sha256;
 use sqlx::any::AnyPoolOptions;
+use std::sync::Arc;
 use tower::ServiceExt;
 
 type HmacSha256 = Hmac<Sha256>;
@@ -46,10 +47,13 @@ async fn setup_test_state() -> AppState {
     let github_client = GithubApiClient::new("test-token".to_string())
         .expect("Failed to create GitHub client");
 
+    // Create mock LLM evaluator
+    let llm_evaluator = Arc::new(sc_llm::MockEvaluator::new());
+
     let webhook_secret = WebhookSecret::new("test-secret".to_string());
     let repo_config = RepoConfig::default();
 
-    AppState::new(pool, github_client, repo_config, webhook_secret)
+    AppState::new(pool, github_client, repo_config, webhook_secret, llm_evaluator, 10)
 }
 
 fn compute_signature(body: &[u8], secret: &str) -> String {
