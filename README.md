@@ -260,7 +260,7 @@ sqlx migrate run --database-url "your-database-url"
 cargo test --all
 
 # Specific crate
-cargo test -p mc-api
+cargo test -p meritocrab-api
 
 # With output
 cargo test -- --nocapture
@@ -276,18 +276,18 @@ meritocrab/
 ├── config.toml                # Server configuration
 ├── .meritocrab.toml.example # Per-repo config example
 └── crates/
-    ├── mc-server/             # Entry point, HTTP server setup
-    ├── mc-core/               # Credit scoring (pure functions)
-    ├── mc-github/             # GitHub API + webhook verification
-    ├── mc-llm/                # LLM evaluator trait + implementations
-    ├── mc-db/                 # Database layer + migrations
-    └── mc-api/                # HTTP handlers + middleware
+    ├── meritocrab-server/     # Entry point, HTTP server setup
+    ├── meritocrab-core/       # Credit scoring (pure functions)
+    ├── meritocrab-github/     # GitHub API + webhook verification
+    ├── meritocrab-llm/        # LLM evaluator trait + implementations
+    ├── meritocrab-db/         # Database layer + migrations
+    └── meritocrab-api/        # HTTP handlers + middleware
 ```
 
 ### Adding a New LLM Provider
 
-1. Implement `mc_llm::LlmEvaluator` trait
-2. Add configuration in `mc_llm::create_evaluator()`
+1. Implement `meritocrab_llm::LlmEvaluator` trait
+2. Add configuration in `meritocrab_llm::create_evaluator()`
 3. Update config example with new provider option
 
 ## Production Deployment

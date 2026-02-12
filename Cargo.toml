@@ -1,11 +1,11 @@
 [workspace]
 members = [
-    "crates/mc-server",
-    "crates/mc-core",
-    "crates/mc-github",
-    "crates/mc-llm",
-    "crates/mc-db",
-    "crates/mc-api",
+    "crates/meritocrab-server",
+    "crates/meritocrab-core",
+    "crates/meritocrab-github",
+    "crates/meritocrab-llm",
+    "crates/meritocrab-db",
+    "crates/meritocrab-api",
 ]
 resolver = "2"
 
