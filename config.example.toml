@@ -1,4 +1,4 @@
-# Social Credit System Configuration Example
+# Meritocrab System Configuration Example
 # Copy this file to `config.toml` and customize for your deployment
 
 # ============================================================================
@@ -19,10 +19,10 @@ port = 8080
 [database]
 # Database connection URL
 # For SQLite (development):
-#   url = "sqlite://socialcredit.db"
+#   url = "sqlite://meritocrab.db"
 # For PostgreSQL (production):
 #   url = "postgres://user:password@localhost/socialcredit"
-url = "sqlite://socialcredit.db"
+url = "sqlite://meritocrab.db"
 
 # Maximum number of database connections in the pool
 max_connections = 10
@@ -94,7 +94,7 @@ max_concurrent_llm_evals = 10
 # ============================================================================
 # Credit Scoring Configuration (Default Repository Settings)
 # ============================================================================
-# Individual repositories can override these settings via .socialcredit.toml
+# Individual repositories can override these settings via .meritocrab.toml
 
 [credit]
 # Starting credit for new contributors

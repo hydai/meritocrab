@@ -1,11 +1,11 @@
 [workspace]
 members = [
-    "crates/sc-server",
-    "crates/sc-core",
-    "crates/sc-github",
-    "crates/sc-llm",
-    "crates/sc-db",
-    "crates/sc-api",
+    "crates/mc-server",
+    "crates/mc-core",
+    "crates/mc-github",
+    "crates/mc-llm",
+    "crates/mc-db",
+    "crates/mc-api",
 ]
 resolver = "2"
 

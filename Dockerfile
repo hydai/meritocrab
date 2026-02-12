@@ -15,7 +15,7 @@ COPY Cargo.toml Cargo.lock ./
 COPY crates ./crates
 
 # Build the release binary
-RUN cargo build --release --bin sc-server
+RUN cargo build --release --bin mc-server
 
 # Stage 2: Create minimal runtime image
 FROM debian:bookworm-slim
@@ -33,10 +33,10 @@ RUN useradd -m -u 1000 appuser
 WORKDIR /app
 
 # Copy binary from builder
-COPY --from=builder /app/target/release/sc-server /app/sc-server
+COPY --from=builder /app/target/release/mc-server /app/mc-server
 
 # Copy migrations
-COPY --from=builder /app/crates/sc-db/migrations /app/migrations
+COPY --from=builder /app/crates/mc-db/migrations /app/migrations
 
 # Set ownership
 RUN chown -R appuser:appuser /app
@@ -48,4 +48,4 @@ USER appuser
 EXPOSE 3000
 
 # Run the server
-CMD ["/app/sc-server"]
+CMD ["/app/mc-server"]

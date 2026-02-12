@@ -1,4 +1,4 @@
-# Open Source Social Credit System
+# Open Source Meritocrab System
 
 A reputation/credit system for open source repositories that grades contributors based on contribution quality using LLM evaluation. The system gates PR submissions behind a credit threshold and provides tools for maintainers to manage contributor reputation.
 
@@ -9,7 +9,7 @@ A reputation/credit system for open source repositories that grades contributors
 - **Shadow Blacklist**: Graceful handling of bad actors without alerting them
 - **Maintainer Dashboard**: Web interface for reviewing evaluations and managing contributors
 - **GitHub Integration**: Seamless integration via GitHub Apps and webhooks
-- **Flexible Configuration**: Per-repository custom scoring via `.socialcredit.toml`
+- **Flexible Configuration**: Per-repository custom scoring via `.meritocrab.toml`
 - **Role-Based Bypass**: Maintainers and collaborators exempt from checks
 - **Audit Trail**: Complete history of all credit changes with maintainer overrides
 
@@ -52,8 +52,8 @@ GitHub Webhooks (PR, Comment, Review)
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/yourusername/socialcredit.git
-   cd socialcredit
+   git clone https://github.com/yourusername/meritocrab.git
+   cd meritocrab
    ```
 
 2. **Configure the application**:
@@ -102,7 +102,7 @@ host = "0.0.0.0"
 port = 3000
 
 [database]
-url = "postgres://user:password@localhost/socialcredit"
+url = "postgres://user:password@localhost/meritocrab"
 max_connections = 10
 
 [github]
@@ -127,7 +127,7 @@ blacklist_threshold = 0
 max_concurrent_llm_evals = 5
 ```
 
-### Per-Repository Configuration (`.socialcredit.toml`)
+### Per-Repository Configuration (`.meritocrab.toml`)
 
 Place this file in the root of your repository to customize scoring:
 
@@ -260,7 +260,7 @@ sqlx migrate run --database-url "your-database-url"
 cargo test --all
 
 # Specific crate
-cargo test -p sc-api
+cargo test -p mc-api
 
 # With output
 cargo test -- --nocapture
@@ -269,25 +269,25 @@ cargo test -- --nocapture
 ### Project Structure
 
 ```
-socialcredit/
+meritocrab/
 ├── Cargo.toml                 # Workspace root
 ├── Dockerfile                 # Multi-stage production build
 ├── docker-compose.yml         # Server + PostgreSQL
 ├── config.toml                # Server configuration
-├── .socialcredit.toml.example # Per-repo config example
+├── .meritocrab.toml.example # Per-repo config example
 └── crates/
-    ├── sc-server/             # Entry point, HTTP server setup
-    ├── sc-core/               # Credit scoring (pure functions)
-    ├── sc-github/             # GitHub API + webhook verification
-    ├── sc-llm/                # LLM evaluator trait + implementations
-    ├── sc-db/                 # Database layer + migrations
-    └── sc-api/                # HTTP handlers + middleware
+    ├── mc-server/             # Entry point, HTTP server setup
+    ├── mc-core/               # Credit scoring (pure functions)
+    ├── mc-github/             # GitHub API + webhook verification
+    ├── mc-llm/                # LLM evaluator trait + implementations
+    ├── mc-db/                 # Database layer + migrations
+    └── mc-api/                # HTTP handlers + middleware
 ```
 
 ### Adding a New LLM Provider
 
-1. Implement `sc_llm::LlmEvaluator` trait
-2. Add configuration in `sc_llm::create_evaluator()`
+1. Implement `mc_llm::LlmEvaluator` trait
+2. Add configuration in `mc_llm::create_evaluator()`
 3. Update config example with new provider option
 
 ## Production Deployment
@@ -298,14 +298,14 @@ The provided `Dockerfile` uses multi-stage builds for optimal image size:
 
 ```bash
 # Build
-docker build -t socialcredit:latest .
+docker build -t meritocrab:latest .
 
 # Run
 docker run -p 3000:3000 \
   -e DATABASE_URL=postgres://... \
   -e GITHUB_APP_ID=123456 \
   -v /path/to/private-key.pem:/app/private-key.pem:ro \
-  socialcredit:latest
+  meritocrab:latest
 ```
 
 ### Health Checks
@@ -422,8 +422,8 @@ MIT License - See LICENSE file for details
 ## Support
 
 For issues and questions:
-- GitHub Issues: https://github.com/yourusername/socialcredit/issues
-- Documentation: https://github.com/yourusername/socialcredit/wiki
+- GitHub Issues: https://github.com/yourusername/meritocrab/issues
+- Documentation: https://github.com/yourusername/meritocrab/wiki
 
 ## Acknowledgments
 

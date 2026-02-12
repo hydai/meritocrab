@@ -3,17 +3,17 @@ version: '3.8'
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: socialcredit-postgres
+    container_name: meritocrab-postgres
     environment:
-      POSTGRES_USER: socialcredit
-      POSTGRES_PASSWORD: socialcredit_password
-      POSTGRES_DB: socialcredit
+      POSTGRES_USER: meritocrab
+      POSTGRES_PASSWORD: meritocrab_password
+      POSTGRES_DB: meritocrab
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U socialcredit"]
+      test: ["CMD-SHELL", "pg_isready -U meritocrab"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -22,7 +22,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: socialcredit-server
+    container_name: meritocrab-server
     depends_on:
       postgres:
         condition: service_healthy
@@ -32,7 +32,7 @@ services:
       SERVER_PORT: 3000
 
       # Database configuration
-      DATABASE_URL: postgres://socialcredit:socialcredit_password@postgres:5432/socialcredit
+      DATABASE_URL: postgres://meritocrab:meritocrab_password@postgres:5432/meritocrab
       DATABASE_MAX_CONNECTIONS: 10
 
       # GitHub configuration (override with your values)

@@ -1483,6 +1483,118 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "47e1ffaa40ddd1f3ed91f717a33c8c0ee23fff369e3aa8772b9605cc1d22f4c3"
 
 [[package]]
+name = "mc-api"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "axum",
+ "chrono",
+ "hex",
+ "hmac",
+ "lazy_static",
+ "mc-core",
+ "mc-db",
+ "mc-github",
+ "mc-llm",
+ "oauth2",
+ "rand 0.9.2",
+ "regex",
+ "reqwest 0.13.2",
+ "rustls",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sqlx",
+ "subtle",
+ "tokio",
+ "toml 0.8.23",
+ "tower",
+ "tower-sessions",
+ "tower_governor",
+ "tracing",
+ "urlencoding",
+]
+
+[[package]]
+name = "mc-core"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "mc-db"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "mc-core",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "thiserror 2.0.18",
+ "tokio",
+]
+
+[[package]]
+name = "mc-github"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "axum",
+ "base64",
+ "chrono",
+ "hex",
+ "hmac",
+ "octocrab",
+ "rustls",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "sha2",
+ "subtle",
+ "thiserror 2.0.18",
+ "tokio",
+]
+
+[[package]]
+name = "mc-llm"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "mc-core",
+ "reqwest 0.13.2",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+]
+
+[[package]]
+name = "mc-server"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "config",
+ "mc-api",
+ "mc-core",
+ "mc-db",
+ "mc-github",
+ "mc-llm",
+ "serde",
+ "sqlx",
+ "time",
+ "tokio",
+ "tower",
+ "tower-sessions",
+ "tower-sessions-sqlx-store",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "md-5"
 version = "0.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2393,118 +2505,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "93fc1dc3aaa9bfed95e02e6eadabb4baf7e3078b0bd1b4d7b6b0b68378900502"
 dependencies = [
  "winapi-util",
-]
-
-[[package]]
-name = "sc-api"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "axum",
- "chrono",
- "hex",
- "hmac",
- "lazy_static",
- "oauth2",
- "rand 0.9.2",
- "regex",
- "reqwest 0.13.2",
- "rustls",
- "sc-core",
- "sc-db",
- "sc-github",
- "sc-llm",
- "serde",
- "serde_json",
- "sha2",
- "sqlx",
- "subtle",
- "tokio",
- "toml 0.8.23",
- "tower",
- "tower-sessions",
- "tower_governor",
- "tracing",
- "urlencoding",
-]
-
-[[package]]
-name = "sc-core"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "thiserror 2.0.18",
-]
-
-[[package]]
-name = "sc-db"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "chrono",
- "sc-core",
- "serde",
- "serde_json",
- "sqlx",
- "thiserror 2.0.18",
- "tokio",
-]
-
-[[package]]
-name = "sc-github"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "axum",
- "base64",
- "chrono",
- "hex",
- "hmac",
- "octocrab",
- "rustls",
- "secrecy",
- "serde",
- "serde_json",
- "sha2",
- "subtle",
- "thiserror 2.0.18",
- "tokio",
-]
-
-[[package]]
-name = "sc-llm"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "reqwest 0.13.2",
- "sc-core",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
- "tokio",
-]
-
-[[package]]
-name = "sc-server"
-version = "0.1.0"
-dependencies = [
- "axum",
- "config",
- "sc-api",
- "sc-core",
- "sc-db",
- "sc-github",
- "sc-llm",
- "serde",
- "sqlx",
- "time",
- "tokio",
- "tower",
- "tower-sessions",
- "tower-sessions-sqlx-store",
- "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
