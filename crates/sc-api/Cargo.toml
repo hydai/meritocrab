@@ -5,4 +5,21 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+sc-core = { path = "../sc-core" }
+sc-db = { path = "../sc-db" }
+sc-github = { path = "../sc-github" }
+
+axum = { workspace = true }
+hex = { workspace = true }
+hmac = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+sqlx = { workspace = true }
+subtle = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+rustls = { version = "0.23", features = ["aws-lc-rs"], default-features = false }
+tower = { workspace = true }
