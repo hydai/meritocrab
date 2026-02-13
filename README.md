@@ -1,6 +1,7 @@
 # Meritocrab
 
 [![crates.io](https://img.shields.io/crates/v/meritocrab.svg)](https://crates.io/crates/meritocrab)
+[![CI](https://github.com/hydai/meritocrab/actions/workflows/ci.yml/badge.svg)](https://github.com/hydai/meritocrab/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 A reputation/credit system for open source repositories that grades contributors based on contribution quality using LLM evaluation. The system gates PR submissions behind a credit threshold and provides tools for maintainers to manage contributor reputation.
@@ -409,13 +410,24 @@ max_concurrent_llm_evals = 10  # Default: 5
 - **Database**: Use strong passwords and restrict network access
 - **Shadow Blacklist**: Randomized delays prevent detection of blacklist status
 
+## Releases
+
+Releases are automated via [Knope](https://knope.tech/) and GitHub Actions:
+
+1. Push conventional commits to `master` (e.g., `feat: add rate limiting`, `fix: handle timeout`)
+2. The **prepare-release** workflow creates a release PR with version bumps and changelog
+3. Merge the release PR to publish all 7 crates to crates.io and create a GitHub release
+
+All crate versions stay in sync. Publishing uses [Trusted Publishing](https://doc.rust-lang.org/cargo/reference/registry-authentication.html#trusted-publishing) (OIDC) — no API tokens required.
+
 ## Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes with tests
 4. Run `cargo fmt` and `cargo clippy`
-5. Submit a pull request
+5. Use [Conventional Commits](https://www.conventionalcommits.org/) for commit messages
+6. Submit a pull request — CI will run fmt, clippy, and tests automatically
 
 ## License
 

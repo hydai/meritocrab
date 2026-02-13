@@ -63,9 +63,19 @@ crates/
 - Error types per crate: `CoreError`, `DbError`, `GithubError`, `LlmError`, `ApiError`
 - Database: SQLite for dev/test, PostgreSQL for production (via `sqlx::any`)
 
+## CI / CD
+
+GitHub Actions workflows in `.github/workflows/`:
+
+- **ci.yml** — Runs `fmt`, `clippy`, `test` in parallel on push/PR to `master`
+- **prepare-release.yml** — On push to `master`, Knope creates/updates a release PR with version bumps + changelog
+- **release.yml** — When the release PR merges, publishes all crates to crates.io via Trusted Publishing (OIDC)
+
+Release automation is configured in `knope.toml` (single-package mode, all 7 crates versioned in lockstep). The `versioned_files` list includes all 16 inter-crate dependency version strings that need updating on each release.
+
 ## Publishing
 
-Crates are published to crates.io. Publish order matters due to dependencies:
+Publishing is automated via `cargo-release` in the release workflow. Manual publishing should not be needed, but if required, publish in dependency order:
 
 1. `meritocrab-core` + `meritocrab-github` (parallel)
 2. `meritocrab-db` + `meritocrab-llm` (parallel)
@@ -73,7 +83,7 @@ Crates are published to crates.io. Publish order matters due to dependencies:
 4. `meritocrab-server`
 5. `meritocrab` (facade)
 
-Wait ~30s between tiers for crates.io index propagation. New crate rate limit: ~5 per 10 minutes.
+Wait ~30s between tiers for crates.io index propagation.
 
 ## Files to Never Commit
 
