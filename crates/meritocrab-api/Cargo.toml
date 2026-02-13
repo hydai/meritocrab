@@ -9,10 +9,10 @@ repository.workspace = true
 authors.workspace = true
 
 [dependencies]
-meritocrab-core = { path = "../meritocrab-core", version = "0.1.1" }
-meritocrab-db = { path = "../meritocrab-db", version = "0.1.1" }
-meritocrab-github = { path = "../meritocrab-github", version = "0.1.1" }
-meritocrab-llm = { path = "../meritocrab-llm", version = "0.1.1" }
+meritocrab-core = { path = "../meritocrab-core", version = "0.1.2" }
+meritocrab-db = { path = "../meritocrab-db", version = "0.1.2" }
+meritocrab-github = { path = "../meritocrab-github", version = "0.1.2" }
+meritocrab-llm = { path = "../meritocrab-llm", version = "0.1.2" }
 
 axum = { workspace = true }
 chrono = { workspace = true }
