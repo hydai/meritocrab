@@ -1,3 +1,9 @@
+## 0.1.2 (2026-02-13)
+
+### Fixes
+
+- align release workflow environment with Trusted Publishing config
+
 ## 0.1.1 (2026-02-13)
 
 ### Features
