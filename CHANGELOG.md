@@ -1,3 +1,9 @@
+## 0.1.4 (2026-02-13)
+
+### Fixes
+
+- let cargo own Cargo.lock regeneration instead of knope text-replace
+
 ## 0.1.3 (2026-02-13)
 
 ### Fixes

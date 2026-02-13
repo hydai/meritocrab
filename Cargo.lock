@@ -457,9 +457,9 @@ dependencies = [
 
 [[package]]
 name = "crypto-common"
-version = "0.1.7"
+version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "78c8292055d1c1df0cce5d180393dc8cce0abec0a7102adb6c7b1eef6016d60a"
+checksum = "1bfb12502f3fc46cca1bb51ac28df9d618d813cdc3d2f25b9fe775a34af26bb3"
 dependencies = [
  "generic-array",
  "typenum",
@@ -881,9 +881,9 @@ dependencies = [
 
 [[package]]
 name = "generic-array"
-version = "0.14.7"
+version = "0.14.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85649ca51fd72272d7821adaf274ad91c288277713d9c18820d8499a7ff69e9a"
+checksum = "4bb6743198531e02858aeaea5398fcc883e71851fcbcb5a2f773e2fb6cb1edf2"
 dependencies = [
  "typenum",
  "version_check",
@@ -1500,7 +1500,7 @@ checksum = "f8ca58f447f06ed17d5fc4043ce1b10dd205e060fb3ce5b979b8ed8e59ff3f79"
 
 [[package]]
 name = "meritocrab"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "meritocrab-api",
  "meritocrab-core",
@@ -1511,7 +1511,7 @@ dependencies = [
 
 [[package]]
 name = "meritocrab-api"
-version = "0.1.2"
+version = "0.1.4"
 dependencies = [
  "async-trait",
  "axum",
@@ -1544,7 +1544,7 @@ dependencies = [
 
 [[package]]
 name = "meritocrab-core"
-version = "0.1.2"
+version = "0.1.4"
 dependencies = [
  "serde",
  "serde_json",
@@ -1553,7 +1553,7 @@ dependencies = [
 
 [[package]]
 name = "meritocrab-db"
-version = "0.1.2"
+version = "0.1.4"
 dependencies = [
  "async-trait",
  "chrono",
@@ -1567,7 +1567,7 @@ dependencies = [
 
 [[package]]
 name = "meritocrab-github"
-version = "0.1.2"
+version = "0.1.4"
 dependencies = [
  "async-trait",
  "axum",
@@ -1588,7 +1588,7 @@ dependencies = [
 
 [[package]]
 name = "meritocrab-llm"
-version = "0.1.2"
+version = "0.1.4"
 dependencies = [
  "async-trait",
  "meritocrab-core",
@@ -1601,7 +1601,7 @@ dependencies = [
 
 [[package]]
 name = "meritocrab-server"
-version = "0.1.2"
+version = "0.1.4"
 dependencies = [
  "axum",
  "config",
@@ -2744,9 +2744,9 @@ dependencies = [
 
 [[package]]
 name = "simple_asn1"
-version = "0.6.3"
+version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "297f631f50729c8c99b84667867963997ec0b50f32b2a7dbcab828ef0541e8bb"
+checksum = "0d585997b0ac10be3c5ee635f1bab02d512760d14b7c468801ac8a01d9ae5f1d"
 dependencies = [
  "num-bigint",
  "num-traits",
@@ -3334,9 +3334,9 @@ dependencies = [
 
 [[package]]
 name = "toml_parser"
-version = "1.0.7+spec-1.1.0"
+version = "1.0.8+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "247eaa3197818b831697600aadf81514e577e0cba5eab10f7e064e78ae154df1"
+checksum = "0742ff5ff03ea7e67c8ae6c93cac239e0d9784833362da3f9a9c1da8dfefcbdc"
 dependencies = [
  "winnow",
 ]
