@@ -16,6 +16,16 @@ cargo fmt --all -- --check     # Format check
 
 Tests use in-memory SQLite (`sqlite::memory:`) and require no external services.
 
+## Pre-commit Checklist
+
+Run all three checks before every commit. CI uses `RUSTFLAGS="-Dwarnings"` and `clippy -D warnings`, so any warning is a build failure.
+
+```bash
+cargo fmt --all                        # Auto-fix formatting (edition 2024 import sorting)
+cargo clippy --all -- -D warnings      # Lint with warnings-as-errors
+cargo test --all                       # Run all 176 tests
+```
+
 ## Project Structure
 
 This is a Cargo workspace with 7 crates (6 sub-crates + 1 facade):
