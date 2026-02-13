@@ -1,4 +1,4 @@
-use meritocrab_api::{credit_commands::*, handle_webhook, AppState, OAuthConfig, VerifiedWebhookPayload};
+use meritocrab_api::{AppState, OAuthConfig, credit_commands::*};
 use meritocrab_core::RepoConfig;
 use meritocrab_github::{GithubApiClient, WebhookSecret};
 use sqlx::any::AnyPoolOptions;
@@ -30,17 +30,19 @@ async fn setup_test_state() -> AppState {
         .expect("Failed to enable foreign keys");
 
     // Run migrations
-    sqlx::query(include_str!("../../meritocrab-db/migrations/001_initial.sql"))
-        .execute(&pool)
-        .await
-        .expect("Failed to run migrations");
+    sqlx::query(include_str!(
+        "../../meritocrab-db/migrations/001_initial.sql"
+    ))
+    .execute(&pool)
+    .await
+    .expect("Failed to run migrations");
 
     // Initialize rustls for GitHub client
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
 
     // Create mock GitHub client
-    let github_client = GithubApiClient::new("test-token".to_string())
-        .expect("Failed to create GitHub client");
+    let github_client =
+        GithubApiClient::new("test-token".to_string()).expect("Failed to create GitHub client");
 
     // Create mock LLM evaluator
     let llm_evaluator = Arc::new(meritocrab_llm::MockEvaluator::new());
@@ -77,7 +79,12 @@ async fn test_parse_credit_override_command() {
     let cmd = parse_credit_command(comment);
     assert!(matches!(cmd, Some(CreditCommand::Override { .. })));
 
-    if let Some(CreditCommand::Override { username, delta, reason }) = cmd {
+    if let Some(CreditCommand::Override {
+        username,
+        delta,
+        reason,
+    }) = cmd
+    {
         assert_eq!(username, "user123");
         assert_eq!(delta, 10);
         assert_eq!(reason, "good work");
@@ -90,7 +97,12 @@ async fn test_parse_credit_override_negative() {
     let cmd = parse_credit_command(comment);
     assert!(matches!(cmd, Some(CreditCommand::Override { .. })));
 
-    if let Some(CreditCommand::Override { username, delta, reason }) = cmd {
+    if let Some(CreditCommand::Override {
+        username,
+        delta,
+        reason,
+    }) = cmd
+    {
         assert_eq!(username, "spammer");
         assert_eq!(delta, -25);
         assert_eq!(reason, "spam content");
@@ -131,7 +143,10 @@ async fn test_repo_config_loader_returns_defaults() {
     let state = setup_test_state().await;
 
     // Get config for a non-existent repo (should return defaults)
-    let config = state.repo_config_loader.get_config("test-owner", "test-repo").await;
+    let config = state
+        .repo_config_loader
+        .get_config("test-owner", "test-repo")
+        .await;
 
     // Verify defaults
     assert_eq!(config.starting_credit, 100);
@@ -166,10 +181,15 @@ async fn test_credit_override_applies_delta() {
         .expect("Failed to update credit score");
 
     // Verify update
-    let updated = meritocrab_db::contributors::get_contributor(&state.db_pool, 12345, "test-owner", "test-repo")
-        .await
-        .expect("Failed to get contributor")
-        .expect("Contributor not found");
+    let updated = meritocrab_db::contributors::get_contributor(
+        &state.db_pool,
+        12345,
+        "test-owner",
+        "test-repo",
+    )
+    .await
+    .expect("Failed to get contributor")
+    .expect("Contributor not found");
 
     assert_eq!(updated.credit_score, 115);
 }
@@ -204,10 +224,15 @@ async fn test_credit_override_triggers_auto_blacklist() {
     }
 
     // Verify blacklist
-    let updated = meritocrab_db::contributors::get_contributor(&state.db_pool, 12345, "test-owner", "test-repo")
-        .await
-        .expect("Failed to get contributor")
-        .expect("Contributor not found");
+    let updated = meritocrab_db::contributors::get_contributor(
+        &state.db_pool,
+        12345,
+        "test-owner",
+        "test-repo",
+    )
+    .await
+    .expect("Failed to get contributor")
+    .expect("Contributor not found");
 
     assert_eq!(updated.credit_score, 10); // Credit not updated yet in this test
     assert!(updated.is_blacklisted);
@@ -236,10 +261,15 @@ async fn test_blacklist_command_sets_flag() {
         .expect("Failed to set blacklist");
 
     // Verify blacklist
-    let updated = meritocrab_db::contributors::get_contributor(&state.db_pool, 12345, "test-owner", "test-repo")
-        .await
-        .expect("Failed to get contributor")
-        .expect("Contributor not found");
+    let updated = meritocrab_db::contributors::get_contributor(
+        &state.db_pool,
+        12345,
+        "test-owner",
+        "test-repo",
+    )
+    .await
+    .expect("Failed to get contributor")
+    .expect("Contributor not found");
 
     assert!(updated.is_blacklisted);
 }
@@ -277,7 +307,10 @@ async fn test_credit_events_logged_for_override() {
     assert_eq!(event.delta, 10);
     assert_eq!(event.credit_before, 100);
     assert_eq!(event.credit_after, 110);
-    assert_eq!(event.maintainer_override, Some("Good contribution".to_string()));
+    assert_eq!(
+        event.maintainer_override,
+        Some("Good contribution".to_string())
+    );
 }
 
 #[tokio::test]

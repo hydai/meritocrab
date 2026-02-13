@@ -1,5 +1,5 @@
-use meritocrab_api::{state::AppState, OAuthConfig};
-use meritocrab_core::{config::QualityLevel, RepoConfig};
+use meritocrab_api::{OAuthConfig, state::AppState};
+use meritocrab_core::{RepoConfig, config::QualityLevel};
 use meritocrab_db::{
     contributors::{create_contributor, get_contributor, set_blacklisted},
     credit_events::list_events_by_contributor,
@@ -91,10 +91,12 @@ async fn setup_test_state() -> AppState {
         .await
         .expect("Failed to enable foreign keys");
 
-    sqlx::query(include_str!("../../meritocrab-db/migrations/001_initial.sql"))
-        .execute(&pool)
-        .await
-        .expect("Failed to run migrations");
+    sqlx::query(include_str!(
+        "../../meritocrab-db/migrations/001_initial.sql"
+    ))
+    .execute(&pool)
+    .await
+    .expect("Failed to run migrations");
 
     let github_client = create_mock_github_client();
     let llm_evaluator = Arc::new(meritocrab_llm::MockEvaluator::new());
@@ -129,10 +131,12 @@ async fn setup_test_state_with_evaluator(
         .await
         .expect("Failed to enable foreign keys");
 
-    sqlx::query(include_str!("../../meritocrab-db/migrations/001_initial.sql"))
-        .execute(&pool)
-        .await
-        .expect("Failed to run migrations");
+    sqlx::query(include_str!(
+        "../../meritocrab-db/migrations/001_initial.sql"
+    ))
+    .execute(&pool)
+    .await
+    .expect("Failed to run migrations");
 
     let github_client = create_mock_github_client();
     let webhook_secret = WebhookSecret::new("test-secret".to_string());
@@ -209,7 +213,7 @@ async fn test_auto_blacklist_when_credit_drops_to_zero() {
     // We need to directly call the evaluation function
 
     // For this test, we'll manually trigger evaluation and check auto-blacklist
-    use meritocrab_core::{apply_credit, calculate_delta_with_config, EventType};
+    use meritocrab_core::{EventType, apply_credit, calculate_delta_with_config};
     use meritocrab_db::{contributors::update_credit_score, credit_events::insert_credit_event};
     use meritocrab_llm::{ContentType, EvalContext};
 
@@ -305,7 +309,9 @@ async fn test_auto_blacklist_when_credit_drops_to_zero() {
     assert_eq!(events.len(), 2, "Expected 2 events, got {}", events.len());
 
     // Check pr_opened event
-    let pr_event = events.iter().find(|e| e.event_type == "pr_opened")
+    let pr_event = events
+        .iter()
+        .find(|e| e.event_type == "pr_opened")
         .expect("PR opened event not found");
     assert_eq!(pr_event.delta, -25);
     assert_eq!(pr_event.credit_before, 25);
@@ -320,11 +326,13 @@ async fn test_auto_blacklist_when_credit_drops_to_zero() {
     assert_eq!(auto_blacklist_event.delta, 0);
     assert_eq!(auto_blacklist_event.credit_before, 0);
     assert_eq!(auto_blacklist_event.credit_after, 0);
-    assert!(auto_blacklist_event
-        .maintainer_override
-        .as_ref()
-        .unwrap()
-        .contains("Auto-blacklisted"));
+    assert!(
+        auto_blacklist_event
+            .maintainer_override
+            .as_ref()
+            .unwrap()
+            .contains("Auto-blacklisted")
+    );
 }
 
 /// Test AC4: Blacklisted user comments are skipped (no credit earned)
@@ -403,7 +411,10 @@ async fn test_blacklisted_pr_scheduled_for_delayed_close() {
     use meritocrab_core::check_blacklist;
 
     let should_schedule_delay = contributor.is_blacklisted
-        || check_blacklist(contributor.credit_score, state.repo_config.blacklist_threshold);
+        || check_blacklist(
+            contributor.credit_score,
+            state.repo_config.blacklist_threshold,
+        );
 
     assert!(should_schedule_delay);
 
@@ -433,7 +444,10 @@ async fn test_delay_is_randomized() {
     // Verify delays are not all the same (randomized)
     // With 10 samples, it's extremely unlikely they're all the same if truly random
     // But to avoid flakiness, we check that at least some are different
-    let unique_count = delays.iter().collect::<std::collections::HashSet<_>>().len();
+    let unique_count = delays
+        .iter()
+        .collect::<std::collections::HashSet<_>>()
+        .len();
     assert!(
         unique_count > 1,
         "Expected multiple unique delays, got only {}",

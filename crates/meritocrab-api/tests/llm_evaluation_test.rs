@@ -1,20 +1,23 @@
 /// Integration tests for LLM evaluation in webhooks
 use axum::{
+    Router,
     body::Body,
     http::{Request, StatusCode},
-    Router,
 };
 use hmac::{Hmac, Mac};
-use meritocrab_api::{handle_webhook, health, AppState, OAuthConfig};
+use meritocrab_api::{AppState, OAuthConfig, handle_webhook, health};
 use meritocrab_core::{QualityLevel, RepoConfig};
-use meritocrab_db::{contributors::get_contributor, credit_events::list_events_by_contributor, evaluations::list_evaluations_by_repo_and_status};
+use meritocrab_db::{
+    contributors::get_contributor, credit_events::list_events_by_contributor,
+    evaluations::list_evaluations_by_repo_and_status,
+};
 use meritocrab_github::{GithubApiClient, WebhookSecret};
 use meritocrab_llm::MockEvaluator;
 use serde_json::json;
 use sha2::Sha256;
 use sqlx::any::AnyPoolOptions;
 use std::sync::Arc;
-use tokio::time::{sleep, Duration};
+use tokio::time::{Duration, sleep};
 use tower::ServiceExt;
 
 fn test_oauth_config() -> OAuthConfig {
@@ -45,17 +48,19 @@ async fn setup_test_state_with_evaluator(evaluator: MockEvaluator) -> AppState {
         .expect("Failed to enable foreign keys");
 
     // Run migrations
-    sqlx::query(include_str!("../../meritocrab-db/migrations/001_initial.sql"))
-        .execute(&pool)
-        .await
-        .expect("Failed to run migrations");
+    sqlx::query(include_str!(
+        "../../meritocrab-db/migrations/001_initial.sql"
+    ))
+    .execute(&pool)
+    .await
+    .expect("Failed to run migrations");
 
     // Initialize rustls for GitHub client
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
 
     // Create mock GitHub client
-    let github_client = GithubApiClient::new("test-token".to_string())
-        .expect("Failed to create GitHub client");
+    let github_client =
+        GithubApiClient::new("test-token".to_string()).expect("Failed to create GitHub client");
 
     let webhook_secret = WebhookSecret::new("test-secret".to_string());
     let repo_config = RepoConfig::default();
@@ -169,7 +174,8 @@ async fn test_pr_opened_high_confidence_applies_credit() {
     assert!(event.llm_evaluation.is_some());
 
     // Verify LLM evaluation JSON contains expected fields
-    let llm_eval: serde_json::Value = serde_json::from_str(&event.llm_evaluation.as_ref().unwrap()).unwrap();
+    let llm_eval: serde_json::Value =
+        serde_json::from_str(&event.llm_evaluation.as_ref().unwrap()).unwrap();
     // Check the classification - serde_json represents enums as strings
     assert!(llm_eval["classification"].is_string());
     assert!(llm_eval["confidence"].as_f64().unwrap() >= 0.85);
@@ -179,7 +185,7 @@ async fn test_pr_opened_high_confidence_applies_credit() {
 async fn test_pr_opened_low_confidence_creates_pending_evaluation() {
     // Mock evaluator with low confidence (below 0.85 threshold)
     use meritocrab_core::config::QualityLevel;
-    use meritocrab_llm::{Evaluation, EvalContext, LlmEvaluator};
+    use meritocrab_llm::{EvalContext, Evaluation, LlmEvaluator};
 
     // Create a custom mock that returns low confidence
     #[derive(Debug)]
@@ -187,7 +193,11 @@ async fn test_pr_opened_low_confidence_creates_pending_evaluation() {
 
     #[async_trait::async_trait]
     impl LlmEvaluator for LowConfidenceMock {
-        async fn evaluate(&self, _content: &str, _context: &EvalContext) -> Result<meritocrab_llm::Evaluation, meritocrab_llm::LlmError> {
+        async fn evaluate(
+            &self,
+            _content: &str,
+            _context: &EvalContext,
+        ) -> Result<meritocrab_llm::Evaluation, meritocrab_llm::LlmError> {
             Ok(Evaluation::new(
                 QualityLevel::Acceptable,
                 0.75, // Below 0.85 threshold
@@ -207,11 +217,16 @@ async fn test_pr_opened_low_confidence_creates_pending_evaluation() {
             .connect("sqlite::memory:")
             .await
             .unwrap();
-        sqlx::query("PRAGMA foreign_keys = ON").execute(&pool).await.unwrap();
-        sqlx::query(include_str!("../../meritocrab-db/migrations/001_initial.sql"))
+        sqlx::query("PRAGMA foreign_keys = ON")
             .execute(&pool)
             .await
             .unwrap();
+        sqlx::query(include_str!(
+            "../../meritocrab-db/migrations/001_initial.sql"
+        ))
+        .execute(&pool)
+        .await
+        .unwrap();
         let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
         let github_client = GithubApiClient::new("test-token".to_string()).unwrap();
         let webhook_secret = WebhookSecret::new("test-secret".to_string());

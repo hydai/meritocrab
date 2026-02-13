@@ -1,6 +1,6 @@
 use async_trait::async_trait;
-use reqwest::Client;
 use meritocrab_core::config::QualityLevel;
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
 use crate::prompt::{build_user_prompt, system_prompt};
@@ -229,10 +229,8 @@ mod tests {
 
     #[test]
     fn test_openai_evaluator_with_model() {
-        let evaluator = OpenAiEvaluator::with_model(
-            "test-key".to_string(),
-            "gpt-4-turbo".to_string(),
-        );
+        let evaluator =
+            OpenAiEvaluator::with_model("test-key".to_string(), "gpt-4-turbo".to_string());
         assert_eq!(evaluator.model, "gpt-4-turbo");
     }
 

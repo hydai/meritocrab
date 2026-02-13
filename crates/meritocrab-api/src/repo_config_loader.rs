@@ -87,9 +87,14 @@ impl RepoConfigLoader {
     }
 
     /// Fetch .meritocrab.toml from GitHub repository
-    async fn fetch_config_from_github(&self, repo_owner: &str, repo_name: &str) -> ApiResult<RepoConfig> {
+    async fn fetch_config_from_github(
+        &self,
+        repo_owner: &str,
+        repo_name: &str,
+    ) -> ApiResult<RepoConfig> {
         // Fetch file content from GitHub
-        let file_content = self.github_client
+        let file_content = self
+            .github_client
             .get_file_content(repo_owner, repo_name, ".meritocrab.toml")
             .await?;
 
@@ -104,7 +109,11 @@ impl RepoConfigLoader {
 
         info!(
             "Successfully loaded config for {}/{}: starting_credit={}, pr_threshold={}, blacklist_threshold={}",
-            repo_owner, repo_name, config.starting_credit, config.pr_threshold, config.blacklist_threshold
+            repo_owner,
+            repo_name,
+            config.starting_credit,
+            config.pr_threshold,
+            config.blacklist_threshold
         );
 
         Ok(config)
@@ -147,7 +156,7 @@ mod tests {
 
         // Create GitHub client (will fail when called)
         let github_client = Arc::new(
-            GithubApiClient::new("test-token".to_string()).expect("Failed to create client")
+            GithubApiClient::new("test-token".to_string()).expect("Failed to create client"),
         );
 
         let loader = RepoConfigLoader::new(github_client, 300);
@@ -165,7 +174,7 @@ mod tests {
         let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
 
         let github_client = Arc::new(
-            GithubApiClient::new("test-token".to_string()).expect("Failed to create client")
+            GithubApiClient::new("test-token".to_string()).expect("Failed to create client"),
         );
 
         // Very short TTL for testing
@@ -190,7 +199,7 @@ mod tests {
         let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
 
         let github_client = Arc::new(
-            GithubApiClient::new("test-token".to_string()).expect("Failed to create client")
+            GithubApiClient::new("test-token".to_string()).expect("Failed to create client"),
         );
 
         let loader = RepoConfigLoader::new(github_client, 300);
@@ -210,7 +219,7 @@ mod tests {
         let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
 
         let github_client = Arc::new(
-            GithubApiClient::new("test-token".to_string()).expect("Failed to create client")
+            GithubApiClient::new("test-token".to_string()).expect("Failed to create client"),
         );
 
         let loader = RepoConfigLoader::new(github_client, 300);

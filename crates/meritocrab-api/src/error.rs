@@ -1,7 +1,7 @@
 use axum::{
+    Json,
     http::StatusCode,
     response::{IntoResponse, Response},
-    Json,
 };
 use meritocrab_core::CoreError;
 use meritocrab_db::DbError;
@@ -91,41 +91,21 @@ impl IntoResponse for ApiError {
                 "core_error",
                 e.to_string(),
             ),
-            ApiError::InvalidPayload(msg) => (
-                StatusCode::BAD_REQUEST,
-                "invalid_payload",
-                msg.clone(),
-            ),
-            ApiError::InvalidSignature(msg) => (
-                StatusCode::UNAUTHORIZED,
-                "invalid_signature",
-                msg.clone(),
-            ),
+            ApiError::InvalidPayload(msg) => {
+                (StatusCode::BAD_REQUEST, "invalid_payload", msg.clone())
+            }
+            ApiError::InvalidSignature(msg) => {
+                (StatusCode::UNAUTHORIZED, "invalid_signature", msg.clone())
+            }
             ApiError::Internal(msg) | ApiError::InternalError(msg) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "internal_error",
                 msg.clone(),
             ),
-            ApiError::Unauthorized(msg) => (
-                StatusCode::UNAUTHORIZED,
-                "unauthorized",
-                msg.clone(),
-            ),
-            ApiError::NotFound(msg) => (
-                StatusCode::NOT_FOUND,
-                "not_found",
-                msg.clone(),
-            ),
-            ApiError::BadRequest(msg) => (
-                StatusCode::BAD_REQUEST,
-                "bad_request",
-                msg.clone(),
-            ),
-            ApiError::Forbidden(msg) => (
-                StatusCode::FORBIDDEN,
-                "forbidden",
-                msg.clone(),
-            ),
+            ApiError::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, "unauthorized", msg.clone()),
+            ApiError::NotFound(msg) => (StatusCode::NOT_FOUND, "not_found", msg.clone()),
+            ApiError::BadRequest(msg) => (StatusCode::BAD_REQUEST, "bad_request", msg.clone()),
+            ApiError::Forbidden(msg) => (StatusCode::FORBIDDEN, "forbidden", msg.clone()),
         };
 
         let error_response = ErrorResponse {

@@ -46,28 +46,22 @@ fn extract_signature(headers: &HeaderMap) -> Result<Vec<u8>, ApiError> {
             ApiError::InvalidSignature("X-Hub-Signature-256 header not found".to_string())
         })?
         .to_str()
-        .map_err(|e| {
-            ApiError::InvalidSignature(format!("Invalid header encoding: {}", e))
-        })?;
+        .map_err(|e| ApiError::InvalidSignature(format!("Invalid header encoding: {}", e)))?;
 
     // GitHub sends signature as "sha256=<hex>"
-    let signature_hex = signature_header
-        .strip_prefix("sha256=")
-        .ok_or_else(|| {
-            ApiError::InvalidSignature("Signature must start with 'sha256='".to_string())
-        })?;
+    let signature_hex = signature_header.strip_prefix("sha256=").ok_or_else(|| {
+        ApiError::InvalidSignature("Signature must start with 'sha256='".to_string())
+    })?;
 
     // Decode hex to bytes
-    hex::decode(signature_hex).map_err(|e| {
-        ApiError::InvalidSignature(format!("Invalid hex encoding: {}", e))
-    })
+    hex::decode(signature_hex)
+        .map_err(|e| ApiError::InvalidSignature(format!("Invalid hex encoding: {}", e)))
 }
 
 /// Verify HMAC-SHA256 signature using constant-time comparison
 fn verify_signature(body: &[u8], signature: &[u8], secret: &str) -> Result<(), ApiError> {
-    let mut mac = HmacSha256::new_from_slice(secret.as_bytes()).map_err(|e| {
-        ApiError::Internal(format!("HMAC initialization failed: {}", e))
-    })?;
+    let mut mac = HmacSha256::new_from_slice(secret.as_bytes())
+        .map_err(|e| ApiError::Internal(format!("HMAC initialization failed: {}", e)))?;
 
     mac.update(body);
     let expected = mac.finalize().into_bytes();
@@ -76,22 +70,13 @@ fn verify_signature(body: &[u8], signature: &[u8], secret: &str) -> Result<(), A
     if expected.ct_eq(signature).into() {
         Ok(())
     } else {
-        Err(ApiError::InvalidSignature(
-            "Signature mismatch".to_string(),
-        ))
+        Err(ApiError::InvalidSignature("Signature mismatch".to_string()))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn compute_signature(body: &[u8], secret: &str) -> String {
-        let mut mac = HmacSha256::new_from_slice(secret.as_bytes()).unwrap();
-        mac.update(body);
-        let result = mac.finalize();
-        format!("sha256={}", hex::encode(result.into_bytes()))
-    }
 
     #[test]
     fn test_extract_signature_valid() {
@@ -115,10 +100,7 @@ mod tests {
     #[test]
     fn test_extract_signature_invalid_format() {
         let mut headers = HeaderMap::new();
-        headers.insert(
-            "X-Hub-Signature-256",
-            "invalid-format".parse().unwrap(),
-        );
+        headers.insert("X-Hub-Signature-256", "invalid-format".parse().unwrap());
 
         let result = extract_signature(&headers);
         assert!(result.is_err());

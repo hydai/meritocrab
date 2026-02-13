@@ -51,10 +51,7 @@ impl GithubAppAuth {
 
         // In production, this would use jsonwebtoken crate with RS256
         // For now, return a placeholder that indicates what needs to be done
-        let jwt_payload = format!(
-            "PLACEHOLDER_JWT_FOR_APP_{}_AT_{}",
-            self.app_id, claims.iat
-        );
+        let jwt_payload = format!("PLACEHOLDER_JWT_FOR_APP_{}_AT_{}", self.app_id, claims.iat);
 
         Ok(jwt_payload)
     }
@@ -81,10 +78,7 @@ pub struct InstallationToken {
 impl InstallationToken {
     /// Create new installation token
     pub fn new(token: String, expires_at: SystemTime) -> Self {
-        Self {
-            token,
-            expires_at,
-        }
+        Self { token, expires_at }
     }
 
     /// Get the token value

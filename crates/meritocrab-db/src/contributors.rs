@@ -104,14 +104,13 @@ pub async fn update_credit_score(
     let now = Utc::now();
     let now_str = now.to_rfc3339();
 
-    let result = sqlx::query(
-        "UPDATE contributors SET credit_score = ?, updated_at = ? WHERE id = ?"
-    )
-    .bind(new_score)
-    .bind(&now_str)
-    .bind(contributor_id)
-    .execute(pool)
-    .await?;
+    let result =
+        sqlx::query("UPDATE contributors SET credit_score = ?, updated_at = ? WHERE id = ?")
+            .bind(new_score)
+            .bind(&now_str)
+            .bind(contributor_id)
+            .execute(pool)
+            .await?;
 
     if result.rows_affected() == 0 {
         return Err(DbError::SqlxError(sqlx::Error::RowNotFound));
@@ -129,14 +128,12 @@ pub async fn update_role(
     let now = Utc::now();
     let now_str = now.to_rfc3339();
 
-    let result = sqlx::query(
-        "UPDATE contributors SET role = ?, updated_at = ? WHERE id = ?"
-    )
-    .bind(role)
-    .bind(&now_str)
-    .bind(contributor_id)
-    .execute(pool)
-    .await?;
+    let result = sqlx::query("UPDATE contributors SET role = ?, updated_at = ? WHERE id = ?")
+        .bind(role)
+        .bind(&now_str)
+        .bind(contributor_id)
+        .execute(pool)
+        .await?;
 
     if result.rows_affected() == 0 {
         return Err(DbError::SqlxError(sqlx::Error::RowNotFound));
@@ -155,14 +152,13 @@ pub async fn set_blacklisted(
     let now_str = now.to_rfc3339();
     let is_blacklisted_int = if is_blacklisted { 1 } else { 0 };
 
-    let result = sqlx::query(
-        "UPDATE contributors SET is_blacklisted = ?, updated_at = ? WHERE id = ?"
-    )
-    .bind(is_blacklisted_int)
-    .bind(&now_str)
-    .bind(contributor_id)
-    .execute(pool)
-    .await?;
+    let result =
+        sqlx::query("UPDATE contributors SET is_blacklisted = ?, updated_at = ? WHERE id = ?")
+            .bind(is_blacklisted_int)
+            .bind(&now_str)
+            .bind(contributor_id)
+            .execute(pool)
+            .await?;
 
     if result.rows_affected() == 0 {
         return Err(DbError::SqlxError(sqlx::Error::RowNotFound));
@@ -205,13 +201,12 @@ pub async fn count_contributors_by_repo(
     repo_owner: &str,
     repo_name: &str,
 ) -> DbResult<i64> {
-    let count: (i64,) = sqlx::query_as(
-        "SELECT COUNT(*) FROM contributors WHERE repo_owner = ? AND repo_name = ?"
-    )
-    .bind(repo_owner)
-    .bind(repo_name)
-    .fetch_one(pool)
-    .await?;
+    let count: (i64,) =
+        sqlx::query_as("SELECT COUNT(*) FROM contributors WHERE repo_owner = ? AND repo_name = ?")
+            .bind(repo_owner)
+            .bind(repo_name)
+            .fetch_one(pool)
+            .await?;
 
     Ok(count.0)
 }

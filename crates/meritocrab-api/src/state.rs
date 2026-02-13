@@ -55,6 +55,7 @@ pub struct AppState {
 
 impl AppState {
     /// Create new application state
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         db_pool: Pool<Any>,
         github_client: GithubApiClient,

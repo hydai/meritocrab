@@ -9,7 +9,7 @@ use tower_sessions::Session;
 use tracing::{error, warn};
 
 use crate::error::ApiError;
-use crate::oauth::{get_session_user, GithubUser};
+use crate::oauth::{GithubUser, get_session_user};
 use std::sync::Arc;
 
 /// Auth middleware that checks if user is authenticated

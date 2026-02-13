@@ -1,5 +1,5 @@
-use regex::Regex;
 use lazy_static::lazy_static;
+use regex::Regex;
 
 /// Parsed /credit command
 #[derive(Debug, Clone, PartialEq)]
@@ -7,7 +7,11 @@ pub enum CreditCommand {
     /// `/credit check @username`
     Check { username: String },
     /// `/credit override @username +10 "reason"`
-    Override { username: String, delta: i32, reason: String },
+    Override {
+        username: String,
+        delta: i32,
+        reason: String,
+    },
     /// `/credit blacklist @username`
     Blacklist { username: String },
 }
@@ -42,7 +46,11 @@ pub fn parse_credit_command(comment_body: &str) -> Option<CreditCommand> {
 
         // Parse delta (includes sign)
         if let Ok(delta) = delta_str.parse::<i32>() {
-            return Some(CreditCommand::Override { username, delta, reason });
+            return Some(CreditCommand::Override {
+                username,
+                delta,
+                reason,
+            });
         }
     }
 
@@ -63,43 +71,64 @@ mod tests {
     fn test_parse_check_command() {
         let comment = "/credit check @user123";
         let cmd = parse_credit_command(comment);
-        assert_eq!(cmd, Some(CreditCommand::Check { username: "user123".to_string() }));
+        assert_eq!(
+            cmd,
+            Some(CreditCommand::Check {
+                username: "user123".to_string()
+            })
+        );
     }
 
     #[test]
     fn test_parse_check_command_with_whitespace() {
         let comment = "/credit check @user123  ";
         let cmd = parse_credit_command(comment);
-        assert_eq!(cmd, Some(CreditCommand::Check { username: "user123".to_string() }));
+        assert_eq!(
+            cmd,
+            Some(CreditCommand::Check {
+                username: "user123".to_string()
+            })
+        );
     }
 
     #[test]
     fn test_parse_override_positive() {
         let comment = r#"/credit override @user123 +10 "good first contribution""#;
         let cmd = parse_credit_command(comment);
-        assert_eq!(cmd, Some(CreditCommand::Override {
-            username: "user123".to_string(),
-            delta: 10,
-            reason: "good first contribution".to_string()
-        }));
+        assert_eq!(
+            cmd,
+            Some(CreditCommand::Override {
+                username: "user123".to_string(),
+                delta: 10,
+                reason: "good first contribution".to_string()
+            })
+        );
     }
 
     #[test]
     fn test_parse_override_negative() {
         let comment = r#"/credit override @spammer -20 "spam PR""#;
         let cmd = parse_credit_command(comment);
-        assert_eq!(cmd, Some(CreditCommand::Override {
-            username: "spammer".to_string(),
-            delta: -20,
-            reason: "spam PR".to_string()
-        }));
+        assert_eq!(
+            cmd,
+            Some(CreditCommand::Override {
+                username: "spammer".to_string(),
+                delta: -20,
+                reason: "spam PR".to_string()
+            })
+        );
     }
 
     #[test]
     fn test_parse_blacklist_command() {
         let comment = "/credit blacklist @badactor";
         let cmd = parse_credit_command(comment);
-        assert_eq!(cmd, Some(CreditCommand::Blacklist { username: "badactor".to_string() }));
+        assert_eq!(
+            cmd,
+            Some(CreditCommand::Blacklist {
+                username: "badactor".to_string()
+            })
+        );
     }
 
     #[test]
@@ -124,17 +153,25 @@ mod tests {
 
 Some context after"#;
         let cmd = parse_credit_command(comment);
-        assert_eq!(cmd, Some(CreditCommand::Check { username: "user123".to_string() }));
+        assert_eq!(
+            cmd,
+            Some(CreditCommand::Check {
+                username: "user123".to_string()
+            })
+        );
     }
 
     #[test]
     fn test_parse_override_with_multiword_reason() {
         let comment = r#"/credit override @user +5 "excellent bug fix with detailed explanation""#;
         let cmd = parse_credit_command(comment);
-        assert_eq!(cmd, Some(CreditCommand::Override {
-            username: "user".to_string(),
-            delta: 5,
-            reason: "excellent bug fix with detailed explanation".to_string()
-        }));
+        assert_eq!(
+            cmd,
+            Some(CreditCommand::Override {
+                username: "user".to_string(),
+                delta: 5,
+                reason: "excellent bug fix with detailed explanation".to_string()
+            })
+        );
     }
 }

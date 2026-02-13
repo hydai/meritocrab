@@ -89,7 +89,11 @@ impl Default for MockEvaluator {
 
 #[async_trait]
 impl LlmEvaluator for MockEvaluator {
-    async fn evaluate(&self, content: &str, _context: &EvalContext) -> Result<Evaluation, LlmError> {
+    async fn evaluate(
+        &self,
+        content: &str,
+        _context: &EvalContext,
+    ) -> Result<Evaluation, LlmError> {
         // If a default classification is set, use it
         if let Some(classification) = self.default_classification {
             return Ok(Evaluation::new(
@@ -125,7 +129,9 @@ mod tests {
             thread_context: None,
         };
 
-        let result = evaluator.evaluate("Click here for free money!", &context).await;
+        let result = evaluator
+            .evaluate("Click here for free money!", &context)
+            .await;
         assert!(result.is_ok());
 
         let eval = result.unwrap();

@@ -1,14 +1,13 @@
 mod config;
 
 use axum::{
-    middleware,
+    Router, middleware,
     routing::{get, post},
-    Router,
 };
 use config::AppConfig;
 use meritocrab_api::{
-    admin_handlers, auth_middleware, handle_webhook, health, init_server_start_time, oauth,
-    AppState, OAuthConfig,
+    AppState, OAuthConfig, admin_handlers, auth_middleware, handle_webhook, health,
+    init_server_start_time, oauth,
 };
 use meritocrab_db::run_migrations;
 use meritocrab_github::{GithubApiClient, GithubAppAuth, InstallationTokenManager, WebhookSecret};
@@ -17,7 +16,6 @@ use sqlx::any::AnyPoolOptions;
 use std::fs;
 use tower_sessions::{Expiry, MemoryStore, SessionManagerLayer};
 use tracing::{error, info};
-use tracing_subscriber;
 
 #[tokio::main]
 async fn main() {
@@ -77,10 +75,7 @@ async fn main() {
     };
 
     // Create GitHub App authentication
-    let github_auth = GithubAppAuth::new(
-        config.github.app_id as i64,
-        private_key,
-    );
+    let github_auth = GithubAppAuth::new(config.github.app_id as i64, private_key);
 
     // Create installation token manager
     let mut token_manager = InstallationTokenManager::new(github_auth);

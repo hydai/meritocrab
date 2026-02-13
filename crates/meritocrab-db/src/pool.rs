@@ -1,5 +1,5 @@
 use crate::error::DbResult;
-use sqlx::{any::AnyPoolOptions, Any, Pool};
+use sqlx::{Any, Pool, any::AnyPoolOptions};
 
 /// Create a database pool from a connection string
 pub async fn create_pool(database_url: &str) -> DbResult<Pool<Any>> {
@@ -14,9 +14,7 @@ pub async fn create_pool(database_url: &str) -> DbResult<Pool<Any>> {
 /// Run migrations on the database
 pub async fn run_migrations(pool: &Pool<Any>) -> DbResult<()> {
     // Enable foreign keys for SQLite (no-op for other databases)
-    let _ = sqlx::query("PRAGMA foreign_keys = ON")
-        .execute(pool)
-        .await;
+    let _ = sqlx::query("PRAGMA foreign_keys = ON").execute(pool).await;
 
     // Execute the initial migration
     // Note: This only executes the first statement. For multiple statements,

@@ -1,6 +1,6 @@
 use async_trait::async_trait;
-use reqwest::Client;
 use meritocrab_core::config::QualityLevel;
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
 use crate::prompt::{build_user_prompt, system_prompt};

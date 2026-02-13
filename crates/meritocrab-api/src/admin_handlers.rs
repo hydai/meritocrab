@@ -1,20 +1,20 @@
 use axum::{
+    Extension,
     extract::{Path, Query, State},
     http::StatusCode,
     response::{IntoResponse, Json, Response},
-    Extension,
 };
-use meritocrab_core::{
-    credit::apply_credit,
-    EvaluationStatus,
-};
+use meritocrab_core::{EvaluationStatus, credit::apply_credit};
 use meritocrab_db::{
     contributors::{
         count_contributors_by_repo, get_contributor_by_id, list_contributors_by_repo,
         set_blacklisted, update_credit_score,
     },
     credit_events::{count_events_by_repo, insert_credit_event, list_events_by_repo},
-    evaluations::{approve_evaluation, get_evaluation, list_evaluations_by_repo_and_status, override_evaluation},
+    evaluations::{
+        approve_evaluation, get_evaluation, list_evaluations_by_repo_and_status,
+        override_evaluation,
+    },
 };
 use serde::{Deserialize, Serialize};
 use tracing::{error, info};
@@ -139,13 +139,19 @@ pub async fn list_evaluations(
     let offset = (pagination.page - 1) * pagination.per_page;
 
     // Fetch evaluations from database
-    let evaluations =
-        list_evaluations_by_repo_and_status(&state.db_pool, &owner, &repo, &status, pagination.per_page, offset)
-            .await
-            .map_err(|e| {
-                error!("Failed to list evaluations: {}", e);
-                ApiError::InternalError(format!("Database error: {}", e))
-            })?;
+    let evaluations = list_evaluations_by_repo_and_status(
+        &state.db_pool,
+        &owner,
+        &repo,
+        &status,
+        pagination.per_page,
+        offset,
+    )
+    .await
+    .map_err(|e| {
+        error!("Failed to list evaluations: {}", e);
+        ApiError::InternalError(format!("Database error: {}", e))
+    })?;
 
     // Count total evaluations
     let total = evaluations.len() as i64; // For simplicity, we're not implementing count separately
@@ -215,7 +221,10 @@ pub async fn approve_evaluation_handler(
             ApiError::InternalError(format!("Database error: {}", e))
         })?
         .ok_or_else(|| {
-            ApiError::NotFound(format!("Contributor not found: {}", evaluation.contributor_id))
+            ApiError::NotFound(format!(
+                "Contributor not found: {}",
+                evaluation.contributor_id
+            ))
         })?;
 
     // Apply credit delta
@@ -304,7 +313,10 @@ pub async fn override_evaluation_handler(
             ApiError::InternalError(format!("Database error: {}", e))
         })?
         .ok_or_else(|| {
-            ApiError::NotFound(format!("Contributor not found: {}", evaluation.contributor_id))
+            ApiError::NotFound(format!(
+                "Contributor not found: {}",
+                evaluation.contributor_id
+            ))
         })?;
 
     // Apply custom delta
@@ -510,7 +522,10 @@ pub async fn toggle_contributor_blacklist(
         contributor.credit_score,
         contributor.credit_score,
         None,
-        Some(format!("Blacklist toggled by maintainer to: {}", new_status)),
+        Some(format!(
+            "Blacklist toggled by maintainer to: {}",
+            new_status
+        )),
     )
     .await
     .map_err(|e| {

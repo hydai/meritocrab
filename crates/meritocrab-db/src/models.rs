@@ -25,7 +25,7 @@ pub(crate) struct ContributorRaw {
     pub repo_name: String,
     pub credit_score: i32,
     pub role: Option<String>,
-    pub is_blacklisted: i32,  // SQLite BOOLEAN as INTEGER
+    pub is_blacklisted: i32, // SQLite BOOLEAN as INTEGER
     pub created_at: String,
     pub updated_at: String,
 }

@@ -1,6 +1,6 @@
 use axum::{
     extract::{FromRequest, Request},
-    http::{header::HeaderMap, StatusCode},
+    http::{StatusCode, header::HeaderMap},
     response::{IntoResponse, Response},
 };
 use hmac::{Hmac, Mac};
@@ -126,10 +126,7 @@ impl IntoResponse for WebhookError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use axum::{
-        body::Body,
-        http::Request,
-    };
+    use axum::{body::Body, http::Request};
 
     fn compute_signature(body: &[u8], secret: &str) -> String {
         let mut mac = HmacSha256::new_from_slice(secret.as_bytes()).unwrap();
@@ -159,7 +156,8 @@ mod tests {
     async fn test_invalid_signature() {
         let secret = WebhookSecret::new("test-secret".to_string());
         let body = b"test body";
-        let wrong_signature = "sha256=0000000000000000000000000000000000000000000000000000000000000000";
+        let wrong_signature =
+            "sha256=0000000000000000000000000000000000000000000000000000000000000000";
 
         let req = Request::builder()
             .header("X-Hub-Signature-256", wrong_signature)
@@ -177,9 +175,7 @@ mod tests {
         let secret = WebhookSecret::new("test-secret".to_string());
         let body = b"test body";
 
-        let req = Request::builder()
-            .body(Body::from(body.to_vec()))
-            .unwrap();
+        let req = Request::builder().body(Body::from(body.to_vec())).unwrap();
 
         let result = VerifiedWebhook::from_request(req, &secret).await;
         assert!(result.is_err());

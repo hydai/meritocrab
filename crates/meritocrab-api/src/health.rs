@@ -1,4 +1,4 @@
-use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
+use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
 
@@ -101,13 +101,15 @@ fn check_llm_status(state: &AppState) -> LlmProviderStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::OAuthConfig;
     use axum::extract::State;
     use meritocrab_core::RepoConfig;
-    use meritocrab_github::{GithubApiClient, GithubAppAuth, InstallationTokenManager, WebhookSecret};
+    use meritocrab_github::{
+        GithubApiClient, GithubAppAuth, InstallationTokenManager, WebhookSecret,
+    };
     use meritocrab_llm::MockEvaluator;
     use sqlx::any::AnyPoolOptions;
     use std::sync::Arc;
-    use crate::OAuthConfig;
 
     #[tokio::test]
     async fn test_health_endpoint() {

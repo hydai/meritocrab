@@ -1,21 +1,20 @@
-use crate::{
-    error::ApiResult,
-    extractors::VerifiedWebhookPayload,
-    state::AppState,
+use crate::{error::ApiResult, extractors::VerifiedWebhookPayload, state::AppState};
+use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
+use meritocrab_core::{
+    EventType, GateResult, apply_credit, calculate_delta_with_config, check_blacklist,
+    check_pr_gate,
 };
-use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
-use rand::Rng;
-use meritocrab_core::{check_blacklist, check_pr_gate, calculate_delta_with_config, apply_credit, EventType, GateResult};
 use meritocrab_db::{
-    contributors::{lookup_or_create_contributor, update_credit_score, set_blacklisted},
+    contributors::{lookup_or_create_contributor, set_blacklisted, update_credit_score},
     credit_events::insert_credit_event,
     evaluations::insert_evaluation,
 };
-use meritocrab_github::{PullRequestEvent, IssueCommentEvent, PullRequestReviewEvent};
+use meritocrab_github::{IssueCommentEvent, PullRequestEvent, PullRequestReviewEvent};
 use meritocrab_llm::{ContentType, EvalContext};
+use rand::Rng;
 use serde_json::Value;
 use std::time::Duration;
-use tracing::{info, warn, error};
+use tracing::{error, info, warn};
 
 /// Webhook handler for GitHub events
 ///
@@ -41,19 +40,25 @@ pub async fn handle_webhook(
                 if action == "submitted" {
                     let event: PullRequestReviewEvent = serde_json::from_slice(&body)?;
                     process_pr_review_submitted(state, event).await?;
-                    return Ok((StatusCode::OK, Json(serde_json::json!({
-                        "status": "ok",
-                        "message": "Review processed successfully"
-                    }))));
+                    return Ok((
+                        StatusCode::OK,
+                        Json(serde_json::json!({
+                            "status": "ok",
+                            "message": "Review processed successfully"
+                        })),
+                    ));
                 }
             } else if action == "opened" {
                 // This is a pull_request.opened event
                 let event: PullRequestEvent = serde_json::from_slice(&body)?;
                 process_pr_opened(state, event).await?;
-                return Ok((StatusCode::OK, Json(serde_json::json!({
-                    "status": "ok",
-                    "message": "PR processed successfully"
-                }))));
+                return Ok((
+                    StatusCode::OK,
+                    Json(serde_json::json!({
+                        "status": "ok",
+                        "message": "PR processed successfully"
+                    })),
+                ));
             }
         }
 
@@ -65,10 +70,13 @@ pub async fn handle_webhook(
                     // Only process comments on pull requests
                     if event.issue.pull_request.is_some() {
                         process_comment_created(state, event).await?;
-                        return Ok((StatusCode::OK, Json(serde_json::json!({
-                            "status": "ok",
-                            "message": "Comment processed successfully"
-                        }))));
+                        return Ok((
+                            StatusCode::OK,
+                            Json(serde_json::json!({
+                                "status": "ok",
+                                "message": "Comment processed successfully"
+                            })),
+                        ));
                     }
                 }
             }
@@ -77,10 +85,13 @@ pub async fn handle_webhook(
 
     // Return 200 OK for unhandled events
     info!("Received webhook event (not handled), ignoring");
-    Ok((StatusCode::OK, Json(serde_json::json!({
-        "status": "ok",
-        "message": "Event type not processed"
-    }))))
+    Ok((
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "status": "ok",
+            "message": "Event type not processed"
+        })),
+    ))
 }
 
 /// Process a PR opened event
@@ -138,7 +149,12 @@ async fn process_pr_opened(state: AppState, event: PullRequestEvent) -> ApiResul
     );
 
     // Step 3: Check if contributor is blacklisted (or check is_blacklisted field)
-    if contributor.is_blacklisted || check_blacklist(contributor.credit_score, state.repo_config.blacklist_threshold) {
+    if contributor.is_blacklisted
+        || check_blacklist(
+            contributor.credit_score,
+            state.repo_config.blacklist_threshold,
+        )
+    {
         warn!(
             "Contributor {} is blacklisted (credit: {}, is_blacklisted: {}), scheduling delayed PR close for #{}",
             username, contributor.credit_score, contributor.is_blacklisted, pr_number
@@ -254,14 +270,8 @@ fn schedule_delayed_pr_close(
         // Close PR with generic message (no mention of blacklist/credit/spam)
         let generic_message = "Thank you for your contribution. Unfortunately, we are unable to accept this pull request at this time.";
 
-        if let Err(e) = close_pr_with_message(
-            &state,
-            &repo_owner,
-            &repo_name,
-            pr_number,
-            generic_message,
-        )
-        .await
+        if let Err(e) =
+            close_pr_with_message(&state, &repo_owner, &repo_name, pr_number, generic_message).await
         {
             error!(
                 "Failed to close blacklisted PR #{} for {}: {}",
@@ -277,7 +287,10 @@ fn schedule_delayed_pr_close(
 }
 
 /// Process a pull request review submitted event
-async fn process_pr_review_submitted(state: AppState, event: PullRequestReviewEvent) -> ApiResult<()> {
+async fn process_pr_review_submitted(
+    state: AppState,
+    event: PullRequestReviewEvent,
+) -> ApiResult<()> {
     let user_id = event.review.user.id;
     let username = &event.review.user.login;
     let repo_owner = &event.repository.owner.login;
@@ -323,7 +336,10 @@ async fn process_pr_review_submitted(state: AppState, event: PullRequestReviewEv
     .await?;
 
     // Check if blacklisted (skip credit for blacklisted users)
-    if check_blacklist(contributor.credit_score, state.repo_config.blacklist_threshold) {
+    if check_blacklist(
+        contributor.credit_score,
+        state.repo_config.blacklist_threshold,
+    ) {
         info!(
             "Contributor {} is blacklisted, skipping credit for review",
             username
@@ -431,7 +447,10 @@ async fn process_comment_created(state: AppState, event: IssueCommentEvent) -> A
     .await?;
 
     // STEP 4: Check if blacklisted (comment stays but no credit earned)
-    if check_blacklist(contributor.credit_score, state.repo_config.blacklist_threshold) {
+    if check_blacklist(
+        contributor.credit_score,
+        state.repo_config.blacklist_threshold,
+    ) {
         info!(
             "Contributor {} is blacklisted, skipping credit for comment",
             username
@@ -501,8 +520,21 @@ async fn process_credit_command(
         CreditCommand::Check { username } => {
             handle_credit_check(state, repo_owner, repo_name, issue_number, username).await
         }
-        CreditCommand::Override { username, delta, reason } => {
-            handle_credit_override(state, repo_owner, repo_name, issue_number, username, delta, reason).await
+        CreditCommand::Override {
+            username,
+            delta,
+            reason,
+        } => {
+            handle_credit_override(
+                state,
+                repo_owner,
+                repo_name,
+                issue_number,
+                username,
+                delta,
+                reason,
+            )
+            .await
         }
         CreditCommand::Blacklist { username } => {
             handle_credit_blacklist(state, repo_owner, repo_name, issue_number, username).await
@@ -534,7 +566,13 @@ async fn handle_credit_check(
     // For now, we'll use a simplified approach: query by github_user_id if username is numeric
 
     let contributor_opt = if let Ok(github_user_id) = target_username.parse::<i64>() {
-        meritocrab_db::contributors::get_contributor(&state.db_pool, github_user_id, &repo_owner, &repo_name).await?
+        meritocrab_db::contributors::get_contributor(
+            &state.db_pool,
+            github_user_id,
+            &repo_owner,
+            &repo_name,
+        )
+        .await?
     } else {
         // We don't have username stored, so we can't look up by username
         // Return error message
@@ -552,7 +590,10 @@ async fn handle_credit_check(
     let contributor = match contributor_opt {
         Some(c) => c,
         None => {
-            let response = format!("Contributor @{} not found in {}/{}.", target_username, repo_owner, repo_name);
+            let response = format!(
+                "Contributor @{} not found in {}/{}.",
+                target_username, repo_owner, repo_name
+            );
             state
                 .github_client
                 .add_comment(&repo_owner, &repo_name, issue_number, &response)
@@ -571,13 +612,23 @@ async fn handle_credit_check(
     .await?;
 
     // Format response
-    let mut response = format!(
-        "**Credit Report for @{}**\n\n",
-        target_username
-    );
-    response.push_str(&format!("- Credit Score: **{}**\n", contributor.credit_score));
-    response.push_str(&format!("- Role: {}\n", contributor.role.as_deref().unwrap_or("contributor")));
-    response.push_str(&format!("- Blacklisted: {}\n", if contributor.is_blacklisted { "Yes" } else { "No" }));
+    let mut response = format!("**Credit Report for @{}**\n\n", target_username);
+    response.push_str(&format!(
+        "- Credit Score: **{}**\n",
+        contributor.credit_score
+    ));
+    response.push_str(&format!(
+        "- Role: {}\n",
+        contributor.role.as_deref().unwrap_or("contributor")
+    ));
+    response.push_str(&format!(
+        "- Blacklisted: {}\n",
+        if contributor.is_blacklisted {
+            "Yes"
+        } else {
+            "No"
+        }
+    ));
     response.push_str("\n**Recent Credit History (last 5 events):**\n\n");
 
     if events.is_empty() {
@@ -587,7 +638,11 @@ async fn handle_credit_check(
             response.push_str(&format!(
                 "- `{}`: {} ({} -> {}) — {}\n",
                 event.event_type,
-                if event.delta >= 0 { format!("+{}", event.delta) } else { event.delta.to_string() },
+                if event.delta >= 0 {
+                    format!("+{}", event.delta)
+                } else {
+                    event.delta.to_string()
+                },
                 event.credit_before,
                 event.credit_after,
                 event.created_at.format("%Y-%m-%d %H:%M UTC")
@@ -601,7 +656,10 @@ async fn handle_credit_check(
         .add_comment(&repo_owner, &repo_name, issue_number, &response)
         .await?;
 
-    info!("Replied with credit report for {} in {}/{}", target_username, repo_owner, repo_name);
+    info!(
+        "Replied with credit report for {} in {}/{}",
+        target_username, repo_owner, repo_name
+    );
     Ok(())
 }
 
@@ -622,7 +680,13 @@ async fn handle_credit_override(
 
     // Look up contributor (same limitation as credit check)
     let contributor_opt = if let Ok(github_user_id) = target_username.parse::<i64>() {
-        meritocrab_db::contributors::get_contributor(&state.db_pool, github_user_id, &repo_owner, &repo_name).await?
+        meritocrab_db::contributors::get_contributor(
+            &state.db_pool,
+            github_user_id,
+            &repo_owner,
+            &repo_name,
+        )
+        .await?
     } else {
         let response = format!(
             "Unable to find contributor @{}. Note: Use GitHub user ID instead of username for now.",
@@ -638,7 +702,10 @@ async fn handle_credit_override(
     let contributor = match contributor_opt {
         Some(c) => c,
         None => {
-            let response = format!("Contributor @{} not found in {}/{}.", target_username, repo_owner, repo_name);
+            let response = format!(
+                "Contributor @{} not found in {}/{}.",
+                target_username, repo_owner, repo_name
+            );
             state
                 .github_client
                 .add_comment(&repo_owner, &repo_name, issue_number, &response)
@@ -673,7 +740,9 @@ async fn handle_credit_override(
     );
 
     // Check if auto-blacklist should trigger
-    if credit_after <= state.repo_config.blacklist_threshold && credit_before > state.repo_config.blacklist_threshold {
+    if credit_after <= state.repo_config.blacklist_threshold
+        && credit_before > state.repo_config.blacklist_threshold
+    {
         warn!(
             "Auto-blacklisting user {} due to credit override (credit dropped to {})",
             target_username, credit_after
@@ -689,7 +758,10 @@ async fn handle_credit_override(
             credit_after,
             credit_after,
             None,
-            Some(format!("Auto-blacklisted due to credit dropping to {}", credit_after)),
+            Some(format!(
+                "Auto-blacklisted due to credit dropping to {}",
+                credit_after
+            )),
         )
         .await?;
     }
@@ -700,7 +772,11 @@ async fn handle_credit_override(
         target_username,
         credit_before,
         credit_after,
-        if delta >= 0 { format!("+{}", delta) } else { delta.to_string() },
+        if delta >= 0 {
+            format!("+{}", delta)
+        } else {
+            delta.to_string()
+        },
         reason
     );
 
@@ -709,7 +785,10 @@ async fn handle_credit_override(
         .add_comment(&repo_owner, &repo_name, issue_number, &response)
         .await?;
 
-    info!("Replied with credit override confirmation for {} in {}/{}", target_username, repo_owner, repo_name);
+    info!(
+        "Replied with credit override confirmation for {} in {}/{}",
+        target_username, repo_owner, repo_name
+    );
     Ok(())
 }
 
@@ -728,7 +807,13 @@ async fn handle_credit_blacklist(
 
     // Look up contributor (same limitation as credit check)
     let contributor_opt = if let Ok(github_user_id) = target_username.parse::<i64>() {
-        meritocrab_db::contributors::get_contributor(&state.db_pool, github_user_id, &repo_owner, &repo_name).await?
+        meritocrab_db::contributors::get_contributor(
+            &state.db_pool,
+            github_user_id,
+            &repo_owner,
+            &repo_name,
+        )
+        .await?
     } else {
         let response = format!(
             "Unable to find contributor @{}. Note: Use GitHub user ID instead of username for now.",
@@ -744,7 +829,10 @@ async fn handle_credit_blacklist(
     let contributor = match contributor_opt {
         Some(c) => c,
         None => {
-            let response = format!("Contributor @{} not found in {}/{}.", target_username, repo_owner, repo_name);
+            let response = format!(
+                "Contributor @{} not found in {}/{}.",
+                target_username, repo_owner, repo_name
+            );
             state
                 .github_client
                 .add_comment(&repo_owner, &repo_name, issue_number, &response)
@@ -769,21 +857,28 @@ async fn handle_credit_blacklist(
     )
     .await?;
 
-    info!("Blacklisted user {} in {}/{}", target_username, repo_owner, repo_name);
+    info!(
+        "Blacklisted user {} in {}/{}",
+        target_username, repo_owner, repo_name
+    );
 
     // Reply with vague confirmation (as per spec)
     let response = "User status updated.";
 
     state
         .github_client
-        .add_comment(&repo_owner, &repo_name, issue_number, &response)
+        .add_comment(&repo_owner, &repo_name, issue_number, response)
         .await?;
 
-    info!("Replied with blacklist confirmation for {} in {}/{}", target_username, repo_owner, repo_name);
+    info!(
+        "Replied with blacklist confirmation for {} in {}/{}",
+        target_username, repo_owner, repo_name
+    );
     Ok(())
 }
 
 /// Spawn async PR evaluation task
+#[allow(clippy::too_many_arguments)]
 fn spawn_pr_evaluation(
     state: AppState,
     contributor_id: i64,
@@ -817,6 +912,7 @@ fn spawn_pr_evaluation(
 }
 
 /// Spawn async comment evaluation task
+#[allow(clippy::too_many_arguments)]
 fn spawn_comment_evaluation(
     state: AppState,
     contributor_id: i64,
@@ -850,6 +946,7 @@ fn spawn_comment_evaluation(
 }
 
 /// Evaluate content and apply credit based on confidence
+#[allow(clippy::too_many_arguments)]
 async fn evaluate_and_apply_credit(
     state: AppState,
     contributor_id: i64,
@@ -903,20 +1000,23 @@ async fn evaluate_and_apply_credit(
     );
 
     // Calculate credit delta
-    let delta = calculate_delta_with_config(
-        &state.repo_config,
-        event_type,
-        evaluation.classification,
-    );
+    let delta =
+        calculate_delta_with_config(&state.repo_config, event_type, evaluation.classification);
 
     // Serialize LLM evaluation to JSON string
-    let llm_eval_json_str = serde_json::to_string(&evaluation)
-        .map_err(|e| crate::error::ApiError::Internal(format!("Failed to serialize LLM evaluation: {}", e)))?;
+    let llm_eval_json_str = serde_json::to_string(&evaluation).map_err(|e| {
+        crate::error::ApiError::Internal(format!("Failed to serialize LLM evaluation: {}", e))
+    })?;
 
     // Get current contributor state
-    let contributor = meritocrab_db::contributors::get_contributor(&state.db_pool, user_id, &repo_owner, &repo_name)
-        .await?
-        .ok_or_else(|| crate::error::ApiError::Internal("Contributor not found".to_string()))?;
+    let contributor = meritocrab_db::contributors::get_contributor(
+        &state.db_pool,
+        user_id,
+        &repo_owner,
+        &repo_name,
+    )
+    .await?
+    .ok_or_else(|| crate::error::ApiError::Internal("Contributor not found".to_string()))?;
 
     let credit_before = contributor.credit_score;
 
@@ -952,7 +1052,9 @@ async fn evaluate_and_apply_credit(
         );
 
         // Auto-blacklist if credit drops to 0 or below
-        if credit_after <= state.repo_config.blacklist_threshold && credit_before > state.repo_config.blacklist_threshold {
+        if credit_after <= state.repo_config.blacklist_threshold
+            && credit_before > state.repo_config.blacklist_threshold
+        {
             warn!(
                 "Auto-blacklisting user {} (credit dropped to {})",
                 username, credit_after
@@ -970,7 +1072,10 @@ async fn evaluate_and_apply_credit(
                 credit_after,
                 credit_after,
                 None,
-                Some(format!("Auto-blacklisted due to credit dropping to {}", credit_after)),
+                Some(format!(
+                    "Auto-blacklisted due to credit dropping to {}",
+                    credit_after
+                )),
             )
             .await?;
 
@@ -1013,14 +1118,10 @@ async fn evaluate_and_apply_credit(
 mod tests {
     use super::*;
     use crate::{error::ApiError, state::AppState};
-    use hmac::{Hmac, Mac};
     use meritocrab_core::RepoConfig;
     use meritocrab_github::{GithubApiClient, WebhookSecret};
-    use sha2::Sha256;
     use sqlx::any::AnyPoolOptions;
     use std::sync::Arc;
-
-    type HmacSha256 = Hmac<Sha256>;
 
     async fn setup_test_state() -> AppState {
         // Install SQLite driver
@@ -1040,10 +1141,12 @@ mod tests {
             .expect("Failed to enable foreign keys");
 
         // Run migrations
-        sqlx::query(include_str!("../../meritocrab-db/migrations/001_initial.sql"))
-            .execute(&pool)
-            .await
-            .expect("Failed to run migrations");
+        sqlx::query(include_str!(
+            "../../meritocrab-db/migrations/001_initial.sql"
+        ))
+        .execute(&pool)
+        .await
+        .expect("Failed to run migrations");
 
         // Create mock GitHub client (will need to be updated with actual mock)
         let github_client = create_mock_github_client();
@@ -1060,7 +1163,16 @@ mod tests {
             redirect_url: "http://localhost:8080/auth/callback".to_string(),
         };
 
-        AppState::new(pool, github_client, repo_config, webhook_secret, llm_evaluator, 10, oauth_config, 300)
+        AppState::new(
+            pool,
+            github_client,
+            repo_config,
+            webhook_secret,
+            llm_evaluator,
+            10,
+            oauth_config,
+            300,
+        )
     }
 
     fn create_mock_github_client() -> GithubApiClient {
@@ -1070,13 +1182,6 @@ mod tests {
         // For now, create a client that will fail if called
         // In a real test, we'd use wiremock or similar
         GithubApiClient::new("test-token".to_string()).expect("Failed to create mock client")
-    }
-
-    fn compute_signature(body: &[u8], secret: &str) -> String {
-        let mut mac = HmacSha256::new_from_slice(secret.as_bytes()).unwrap();
-        mac.update(body);
-        let result = mac.finalize();
-        format!("sha256={}", hex::encode(result.into_bytes()))
     }
 
     #[tokio::test]
@@ -1131,7 +1236,7 @@ mod tests {
         let api_err: ApiError = json_err.into();
 
         match api_err {
-            ApiError::InvalidPayload(_) => {},
+            ApiError::InvalidPayload(_) => {}
             _ => panic!("Expected InvalidPayload error"),
         }
     }

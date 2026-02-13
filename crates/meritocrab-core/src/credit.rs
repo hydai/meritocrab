@@ -71,9 +71,15 @@ mod tests {
     // Test calculate_delta with default config
     #[test]
     fn test_calculate_delta_pr_opened() {
-        assert_eq!(calculate_delta(EventType::PrOpened, QualityLevel::Spam), -25);
+        assert_eq!(
+            calculate_delta(EventType::PrOpened, QualityLevel::Spam),
+            -25
+        );
         assert_eq!(calculate_delta(EventType::PrOpened, QualityLevel::Low), -5);
-        assert_eq!(calculate_delta(EventType::PrOpened, QualityLevel::Acceptable), 5);
+        assert_eq!(
+            calculate_delta(EventType::PrOpened, QualityLevel::Acceptable),
+            5
+        );
         assert_eq!(calculate_delta(EventType::PrOpened, QualityLevel::High), 15);
     }
 
@@ -81,7 +87,10 @@ mod tests {
     fn test_calculate_delta_comment() {
         assert_eq!(calculate_delta(EventType::Comment, QualityLevel::Spam), -10);
         assert_eq!(calculate_delta(EventType::Comment, QualityLevel::Low), -2);
-        assert_eq!(calculate_delta(EventType::Comment, QualityLevel::Acceptable), 1);
+        assert_eq!(
+            calculate_delta(EventType::Comment, QualityLevel::Acceptable),
+            1
+        );
         assert_eq!(calculate_delta(EventType::Comment, QualityLevel::High), 3);
     }
 
@@ -89,16 +98,31 @@ mod tests {
     fn test_calculate_delta_pr_merged() {
         assert_eq!(calculate_delta(EventType::PrMerged, QualityLevel::Spam), 0);
         assert_eq!(calculate_delta(EventType::PrMerged, QualityLevel::Low), 0);
-        assert_eq!(calculate_delta(EventType::PrMerged, QualityLevel::Acceptable), 20);
+        assert_eq!(
+            calculate_delta(EventType::PrMerged, QualityLevel::Acceptable),
+            20
+        );
         assert_eq!(calculate_delta(EventType::PrMerged, QualityLevel::High), 20);
     }
 
     #[test]
     fn test_calculate_delta_review_submitted() {
-        assert_eq!(calculate_delta(EventType::ReviewSubmitted, QualityLevel::Spam), 0);
-        assert_eq!(calculate_delta(EventType::ReviewSubmitted, QualityLevel::Low), 0);
-        assert_eq!(calculate_delta(EventType::ReviewSubmitted, QualityLevel::Acceptable), 5);
-        assert_eq!(calculate_delta(EventType::ReviewSubmitted, QualityLevel::High), 5);
+        assert_eq!(
+            calculate_delta(EventType::ReviewSubmitted, QualityLevel::Spam),
+            0
+        );
+        assert_eq!(
+            calculate_delta(EventType::ReviewSubmitted, QualityLevel::Low),
+            0
+        );
+        assert_eq!(
+            calculate_delta(EventType::ReviewSubmitted, QualityLevel::Acceptable),
+            5
+        );
+        assert_eq!(
+            calculate_delta(EventType::ReviewSubmitted, QualityLevel::High),
+            5
+        );
     }
 
     // Test apply_credit

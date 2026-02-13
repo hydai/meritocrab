@@ -2,7 +2,7 @@ use crate::{
     error::{GithubError, GithubResult},
     types::CollaboratorRole,
 };
-use octocrab::{models::CommentId, Octocrab};
+use octocrab::{Octocrab, models::CommentId};
 
 /// GitHub API client for repository operations
 pub struct GithubApiClient {
@@ -15,7 +15,9 @@ impl GithubApiClient {
         let client = Octocrab::builder()
             .personal_token(token)
             .build()
-            .map_err(|e| GithubError::ApiError(format!("Failed to create octocrab client: {}", e)))?;
+            .map_err(|e| {
+                GithubError::ApiError(format!("Failed to create octocrab client: {}", e))
+            })?;
 
         Ok(Self { client })
     }
@@ -152,7 +154,10 @@ impl GithubApiClient {
             .send()
             .await
             .map_err(|e| {
-                GithubError::ApiError(format!("Failed to fetch file {} from {}/{}: {}", path, owner, repo, e))
+                GithubError::ApiError(format!(
+                    "Failed to fetch file {} from {}/{}: {}",
+                    path, owner, repo, e
+                ))
             })?;
 
         // GitHub returns content as base64-encoded
@@ -162,8 +167,9 @@ impl GithubApiClient {
                 // Decode base64
                 let decoded = base64::Engine::decode(
                     &base64::engine::general_purpose::STANDARD,
-                    encoded_content.replace('\n', "").as_bytes()
-                ).map_err(|e| {
+                    encoded_content.replace('\n', "").as_bytes(),
+                )
+                .map_err(|e| {
                     GithubError::ApiError(format!("Failed to decode base64 content: {}", e))
                 })?;
 

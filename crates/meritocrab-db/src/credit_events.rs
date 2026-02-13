@@ -4,6 +4,7 @@ use chrono::Utc;
 use sqlx::{Any, Pool};
 
 /// Insert a new credit event (immutable audit log)
+#[allow(clippy::too_many_arguments)]
 pub async fn insert_credit_event(
     pool: &Pool<Any>,
     contributor_id: i64,
@@ -36,7 +37,7 @@ pub async fn insert_credit_event(
     // In a real scenario, we might query back to get the actual ID, but for simplicity we'll use 0
     // since credit events are append-only and typically queried by contributor_id
     Ok(CreditEvent {
-        id: 0,  // Placeholder ID
+        id: 0, // Placeholder ID
         contributor_id,
         event_type: event_type.to_string(),
         delta,
@@ -75,16 +76,12 @@ pub async fn list_events_by_contributor(
 }
 
 /// Count total events for a contributor
-pub async fn count_events_by_contributor(
-    pool: &Pool<Any>,
-    contributor_id: i64,
-) -> DbResult<i64> {
-    let count: (i64,) = sqlx::query_as(
-        "SELECT COUNT(*) FROM credit_events WHERE contributor_id = ?"
-    )
-    .bind(contributor_id)
-    .fetch_one(pool)
-    .await?;
+pub async fn count_events_by_contributor(pool: &Pool<Any>, contributor_id: i64) -> DbResult<i64> {
+    let count: (i64,) =
+        sqlx::query_as("SELECT COUNT(*) FROM credit_events WHERE contributor_id = ?")
+            .bind(contributor_id)
+            .fetch_one(pool)
+            .await?;
 
     Ok(count.0)
 }
@@ -153,7 +150,7 @@ pub async fn count_events_by_repo(
     let mut query = String::from(
         "SELECT COUNT(*) FROM credit_events ce
          JOIN contributors c ON ce.contributor_id = c.id
-         WHERE c.repo_owner = ? AND c.repo_name = ?"
+         WHERE c.repo_owner = ? AND c.repo_name = ?",
     );
 
     if contributor_id.is_some() {

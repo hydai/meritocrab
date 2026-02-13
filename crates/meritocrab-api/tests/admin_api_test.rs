@@ -1,7 +1,7 @@
 /// Integration tests for admin API endpoints
 /// Note: These tests verify the API structure and basic authentication flow.
 /// Full OAuth integration testing would require more complex mocking.
-use meritocrab_api::{admin_handlers, OAuthConfig};
+use meritocrab_api::{OAuthConfig, admin_handlers};
 use meritocrab_db::{
     contributors::create_contributor, credit_events::insert_credit_event,
     evaluations::insert_evaluation,
@@ -30,10 +30,12 @@ async fn setup_test_db() -> sqlx::Pool<sqlx::Any> {
         .await
         .expect("Failed to enable foreign keys");
 
-    sqlx::query(include_str!("../../meritocrab-db/migrations/001_initial.sql"))
-        .execute(&pool)
-        .await
-        .expect("Failed to run migrations");
+    sqlx::query(include_str!(
+        "../../meritocrab-db/migrations/001_initial.sql"
+    ))
+    .execute(&pool)
+    .await
+    .expect("Failed to run migrations");
 
     pool
 }

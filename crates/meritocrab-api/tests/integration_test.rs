@@ -1,11 +1,11 @@
 /// Integration tests for webhook handler with full flow
 use axum::{
+    Router,
     body::Body,
     http::{Request, StatusCode},
-    Router,
 };
 use hmac::{Hmac, Mac};
-use meritocrab_api::{handle_webhook, health, AppState, OAuthConfig};
+use meritocrab_api::{AppState, OAuthConfig, handle_webhook, health};
 use meritocrab_core::RepoConfig;
 use meritocrab_db::contributors::get_contributor;
 use meritocrab_github::{GithubApiClient, WebhookSecret};
@@ -43,17 +43,19 @@ async fn setup_test_state() -> AppState {
         .expect("Failed to enable foreign keys");
 
     // Run migrations
-    sqlx::query(include_str!("../../meritocrab-db/migrations/001_initial.sql"))
-        .execute(&pool)
-        .await
-        .expect("Failed to run migrations");
+    sqlx::query(include_str!(
+        "../../meritocrab-db/migrations/001_initial.sql"
+    ))
+    .execute(&pool)
+    .await
+    .expect("Failed to run migrations");
 
     // Initialize rustls for GitHub client
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
 
     // Create mock GitHub client
-    let github_client = GithubApiClient::new("test-token".to_string())
-        .expect("Failed to create GitHub client");
+    let github_client =
+        GithubApiClient::new("test-token".to_string()).expect("Failed to create GitHub client");
 
     // Create mock LLM evaluator
     let llm_evaluator = Arc::new(meritocrab_llm::MockEvaluator::new());
@@ -61,7 +63,16 @@ async fn setup_test_state() -> AppState {
     let webhook_secret = WebhookSecret::new("test-secret".to_string());
     let repo_config = RepoConfig::default();
 
-    AppState::new(pool, github_client, repo_config, webhook_secret, llm_evaluator, 10, test_oauth_config(), 300)
+    AppState::new(
+        pool,
+        github_client,
+        repo_config,
+        webhook_secret,
+        llm_evaluator,
+        10,
+        test_oauth_config(),
+        300,
+    )
 }
 
 fn compute_signature(body: &[u8], secret: &str) -> String {

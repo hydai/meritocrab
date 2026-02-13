@@ -14,18 +14,8 @@ fn status_to_string(status: &EvaluationStatus) -> &'static str {
     }
 }
 
-/// Convert string from database to EvaluationStatus
-fn string_to_status(s: &str) -> DbResult<EvaluationStatus> {
-    match s {
-        "pending" => Ok(EvaluationStatus::Pending),
-        "approved" => Ok(EvaluationStatus::Approved),
-        "overridden" => Ok(EvaluationStatus::Overridden),
-        "auto_applied" => Ok(EvaluationStatus::AutoApplied),
-        _ => Err(DbError::InvalidStatus(s.to_string())),
-    }
-}
-
 /// Insert a new pending evaluation
+#[allow(clippy::too_many_arguments)]
 pub async fn insert_evaluation(
     pool: &Pool<Any>,
     id: String,
@@ -74,10 +64,7 @@ pub async fn insert_evaluation(
 }
 
 /// Get an evaluation by ID
-pub async fn get_evaluation(
-    pool: &Pool<Any>,
-    id: &str,
-) -> DbResult<Option<PendingEvaluation>> {
+pub async fn get_evaluation(pool: &Pool<Any>, id: &str) -> DbResult<Option<PendingEvaluation>> {
     let eval = sqlx::query_as::<_, PendingEvaluationRaw>(
         "SELECT id, contributor_id, repo_owner, repo_name, llm_classification, confidence, proposed_delta, status, maintainer_note, final_delta, created_at, updated_at
          FROM pending_evaluations
@@ -134,9 +121,9 @@ pub async fn approve_evaluation(
     let status = status_to_string(&EvaluationStatus::Approved);
 
     // First get the proposed_delta
-    let eval = get_evaluation(pool, id).await?.ok_or_else(|| {
-        DbError::EvaluationNotFound(id.to_string())
-    })?;
+    let eval = get_evaluation(pool, id)
+        .await?
+        .ok_or_else(|| DbError::EvaluationNotFound(id.to_string()))?;
 
     let result = sqlx::query(
         "UPDATE pending_evaluations SET status = ?, maintainer_note = ?, final_delta = ?, updated_at = ? WHERE id = ?"
@@ -186,21 +173,18 @@ pub async fn override_evaluation(
 }
 
 /// Update evaluation status to auto-applied
-pub async fn auto_apply_evaluation(
-    pool: &Pool<Any>,
-    id: &str,
-) -> DbResult<()> {
+pub async fn auto_apply_evaluation(pool: &Pool<Any>, id: &str) -> DbResult<()> {
     let now = Utc::now();
     let now_str = now.to_rfc3339();
     let status = status_to_string(&EvaluationStatus::AutoApplied);
 
     // First get the proposed_delta
-    let eval = get_evaluation(pool, id).await?.ok_or_else(|| {
-        DbError::EvaluationNotFound(id.to_string())
-    })?;
+    let eval = get_evaluation(pool, id)
+        .await?
+        .ok_or_else(|| DbError::EvaluationNotFound(id.to_string()))?;
 
     let result = sqlx::query(
-        "UPDATE pending_evaluations SET status = ?, final_delta = ?, updated_at = ? WHERE id = ?"
+        "UPDATE pending_evaluations SET status = ?, final_delta = ?, updated_at = ? WHERE id = ?",
     )
     .bind(status)
     .bind(eval.proposed_delta)
