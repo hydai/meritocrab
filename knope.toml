@@ -1,0 +1,65 @@
+[package]
+versioned_files = [
+    "Cargo.toml",
+    "Cargo.lock",
+    # Root facade deps
+    { path = "Cargo.toml", dependency = "meritocrab-core" },
+    { path = "Cargo.toml", dependency = "meritocrab-github" },
+    { path = "Cargo.toml", dependency = "meritocrab-db" },
+    { path = "Cargo.toml", dependency = "meritocrab-llm" },
+    { path = "Cargo.toml", dependency = "meritocrab-api" },
+    # meritocrab-db inter-crate dep
+    { path = "crates/meritocrab-db/Cargo.toml", dependency = "meritocrab-core" },
+    # meritocrab-llm inter-crate dep
+    { path = "crates/meritocrab-llm/Cargo.toml", dependency = "meritocrab-core" },
+    # meritocrab-api inter-crate deps
+    { path = "crates/meritocrab-api/Cargo.toml", dependency = "meritocrab-core" },
+    { path = "crates/meritocrab-api/Cargo.toml", dependency = "meritocrab-db" },
+    { path = "crates/meritocrab-api/Cargo.toml", dependency = "meritocrab-github" },
+    { path = "crates/meritocrab-api/Cargo.toml", dependency = "meritocrab-llm" },
+    # meritocrab-server inter-crate deps
+    { path = "crates/meritocrab-server/Cargo.toml", dependency = "meritocrab-api" },
+    { path = "crates/meritocrab-server/Cargo.toml", dependency = "meritocrab-core" },
+    { path = "crates/meritocrab-server/Cargo.toml", dependency = "meritocrab-db" },
+    { path = "crates/meritocrab-server/Cargo.toml", dependency = "meritocrab-github" },
+    { path = "crates/meritocrab-server/Cargo.toml", dependency = "meritocrab-llm" },
+]
+changelog = "CHANGELOG.md"
+
+[github]
+owner = "hydai"
+repo = "meritocrab"
+
+[[workflows]]
+name = "prepare-release"
+
+[[workflows.steps]]
+type = "Command"
+command = "git switch -c release"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "Command"
+command = "git add -A && git commit -m \"chore: prepare release $version\""
+
+[[workflows.steps]]
+type = "Command"
+command = "git push --force --set-upstream origin release"
+
+[[workflows.steps]]
+type = "CreatePullRequest"
+base = "master"
+
+[workflows.steps.title]
+template = "chore: release v$version"
+
+[workflows.steps.body]
+template = "Merging this PR will publish v$version to crates.io and create a GitHub release.\n\n$changelog"
+
+[[workflows]]
+name = "release"
+
+[[workflows.steps]]
+type = "Release"
