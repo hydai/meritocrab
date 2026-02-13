@@ -67,8 +67,9 @@ crates/
 ## Conventions
 
 - Rust edition 2024, minimum Rust version 1.85
-- All internal path dependencies must include `version = "0.1.0"` (crates.io requirement)
-- Workspace-level metadata: version, edition, rust-version, license, repository, authors are inherited via `.workspace = true`
+- Each crate has an explicit `version` in its own `Cargo.toml` (not workspace-inherited) so that knope can bump them all in lockstep
+- All internal path dependencies must include a `version` field (crates.io requirement)
+- Workspace-level metadata: edition, rust-version, license, repository, authors are inherited via `.workspace = true`
 - Each crate has a `description` field for crates.io
 - Error types per crate: `CoreError`, `DbError`, `GithubError`, `LlmError`, `ApiError`
 - Database: SQLite for dev/test, PostgreSQL for production (via `sqlx::any`)
@@ -81,7 +82,7 @@ GitHub Actions workflows in `.github/workflows/`:
 - **prepare-release.yml** — On push to `master`, Knope creates/updates a release PR with version bumps + changelog
 - **release.yml** — When the release PR merges, publishes all crates to crates.io via Trusted Publishing (OIDC)
 
-Release automation is configured in `knope.toml` (single-package mode, all 7 crates versioned in lockstep). The `versioned_files` list includes all 16 inter-crate dependency version strings that need updating on each release.
+Release automation is configured in `knope.toml` (single-package mode, all 7 crates versioned in lockstep). The `versioned_files` list includes the root package, all 6 sub-crate package versions, and all 16 inter-crate dependency version strings. `Cargo.lock` is **not** in `versioned_files` — the prepare-release workflow runs `cargo generate-lockfile` after knope bumps versions so Cargo regenerates it correctly.
 
 ## Publishing
 

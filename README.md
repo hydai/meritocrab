@@ -341,7 +341,7 @@ The `/health` endpoint returns comprehensive status:
 ```json
 {
   "status": "healthy",
-  "version": "0.1.0",
+  "version": "0.1.3",
   "uptime_seconds": 3600,
   "database": {
     "connected": true,
