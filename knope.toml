@@ -1,7 +1,6 @@
 [package]
 versioned_files = [
     "Cargo.toml",
-    "Cargo.lock",
     # Sub-crate package versions
     "crates/meritocrab-core/Cargo.toml",
     "crates/meritocrab-github/Cargo.toml",
@@ -46,6 +45,10 @@ command = "git switch -c release"
 
 [[workflows.steps]]
 type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "Command"
+command = "cargo generate-lockfile"
 
 [[workflows.steps]]
 type = "Command"
