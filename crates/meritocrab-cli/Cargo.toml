@@ -1,0 +1,34 @@
+[package]
+name = "meritocrab-cli"
+description = "CLI binary for GitHub Actions mode of the Meritocrab reputation system"
+version = "0.1.4"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "meritocrab-cli"
+path = "src/main.rs"
+
+[dependencies]
+meritocrab-core = { path = "../meritocrab-core", version = "0.1.4" }
+meritocrab-llm = { path = "../meritocrab-llm", version = "0.1.4" }
+
+# CLI argument parsing
+clap = { version = "4.5.29", features = ["derive"] }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Async runtime
+tokio = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

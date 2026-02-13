@@ -8,6 +8,7 @@ versioned_files = [
     "crates/meritocrab-llm/Cargo.toml",
     "crates/meritocrab-api/Cargo.toml",
     "crates/meritocrab-server/Cargo.toml",
+    "crates/meritocrab-cli/Cargo.toml",
     # Root facade deps
     { path = "Cargo.toml", dependency = "meritocrab-core" },
     { path = "Cargo.toml", dependency = "meritocrab-github" },
@@ -29,6 +30,9 @@ versioned_files = [
     { path = "crates/meritocrab-server/Cargo.toml", dependency = "meritocrab-db" },
     { path = "crates/meritocrab-server/Cargo.toml", dependency = "meritocrab-github" },
     { path = "crates/meritocrab-server/Cargo.toml", dependency = "meritocrab-llm" },
+    # meritocrab-cli inter-crate deps
+    { path = "crates/meritocrab-cli/Cargo.toml", dependency = "meritocrab-core" },
+    { path = "crates/meritocrab-cli/Cargo.toml", dependency = "meritocrab-llm" },
 ]
 changelog = "CHANGELOG.md"
 

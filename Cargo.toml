@@ -21,6 +21,7 @@ meritocrab-api = { path = "crates/meritocrab-api", version = "0.1.4" }
 [workspace]
 members = [
     "crates/meritocrab-server",
+    "crates/meritocrab-cli",
     "crates/meritocrab-core",
     "crates/meritocrab-github",
     "crates/meritocrab-llm",
@@ -48,8 +49,8 @@ octocrab = "0.49.5"
 # Database
 sqlx = { version = "0.8.6", features = ["runtime-tokio", "any", "sqlite", "postgres", "chrono"] }
 
-# LLM HTTP calls
-reqwest = { version = "0.13.2", features = ["json"] }
+# LLM HTTP calls (use rustls instead of native-tls to avoid OpenSSL dependency)
+reqwest = { version = "0.13.2", default-features = false, features = ["json", "rustls", "http2"] }
 
 # HMAC verification
 hmac = "0.12.1"
