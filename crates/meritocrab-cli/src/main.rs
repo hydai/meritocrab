@@ -1,5 +1,5 @@
 use anyhow::{Context, Result, bail};
-use clap::{Args, Parser, Subcommand};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use meritocrab_core::{
     EventType, QualityLevel, RepoConfig, apply_credit, calculate_delta_with_config, check_blacklist,
 };
@@ -7,6 +7,8 @@ use meritocrab_llm::{ContentType, EvalContext, LlmConfig, create_evaluator};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
+
+mod git_state;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -31,11 +33,29 @@ enum Commands {
         #[arg(short, long)]
         llm_config: String,
     },
+    /// Initialize state backend
+    State {
+        #[command(subcommand)]
+        state_command: StateCommands,
+    },
     /// Credit state management commands
     Credit {
         #[command(subcommand)]
         credit_command: CreditCommands,
     },
+}
+
+#[derive(Subcommand)]
+enum StateCommands {
+    /// Initialize git-branch state backend
+    Init(StateInitArgs),
+}
+
+#[derive(Args)]
+struct StateInitArgs {
+    /// Git repository path
+    #[arg(long, default_value = ".")]
+    repo: PathBuf,
 }
 
 #[derive(Subcommand)]
@@ -48,6 +68,14 @@ enum CreditCommands {
     Update(UpdateArgs),
 }
 
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum StateBackend {
+    /// File-based state (default)
+    File,
+    /// Git branch state
+    Git,
+}
+
 #[derive(Args)]
 struct InitArgs {
     /// State directory path
@@ -57,9 +85,17 @@ struct InitArgs {
 
 #[derive(Args)]
 struct CheckArgs {
-    /// State directory path
+    /// State backend
+    #[arg(long, value_enum, default_value = "file")]
+    state_backend: StateBackend,
+
+    /// State directory path (used with file backend)
     #[arg(long, default_value = "./credit-data")]
     state_dir: PathBuf,
+
+    /// Git repository path (used with git backend)
+    #[arg(long, default_value = ".")]
+    repo: PathBuf,
 
     /// Contributor GitHub user ID
     #[arg(long)]
@@ -72,9 +108,17 @@ struct CheckArgs {
 
 #[derive(Args)]
 struct UpdateArgs {
-    /// State directory path
+    /// State backend
+    #[arg(long, value_enum, default_value = "file")]
+    state_backend: StateBackend,
+
+    /// State directory path (used with file backend)
     #[arg(long, default_value = "./credit-data")]
     state_dir: PathBuf,
+
+    /// Git repository path (used with git backend)
+    #[arg(long, default_value = ".")]
+    repo: PathBuf,
 
     /// Contributor GitHub user ID
     #[arg(long)]
@@ -180,6 +224,11 @@ async fn main() -> Result<()> {
         Commands::Evaluate { input, llm_config } => {
             evaluate_command(input, llm_config).await?;
         }
+        Commands::State { state_command } => match state_command {
+            StateCommands::Init(args) => {
+                state_init_command(args)?;
+            }
+        },
         Commands::Credit { credit_command } => match credit_command {
             CreditCommands::Init(args) => {
                 credit_init_command(args)?;
@@ -300,6 +349,16 @@ fn validate_artifact(artifact: &PrArtifact) -> Result<()> {
     Ok(())
 }
 
+/// Initialize git-branch state backend
+fn state_init_command(args: StateInitArgs) -> Result<()> {
+    git_state::init_git_state(&args.repo)?;
+    eprintln!(
+        "Initialized git state backend on meritocrab-data branch in {:?}",
+        args.repo.canonicalize().unwrap_or(args.repo)
+    );
+    Ok(())
+}
+
 /// Initialize credit state directory with empty JSON files
 fn credit_init_command(args: InitArgs) -> Result<()> {
     // Create state directory if it doesn't exist
@@ -330,16 +389,24 @@ fn credit_init_command(args: InitArgs) -> Result<()> {
 
 /// Check contributor credit state
 fn credit_check_command(args: CheckArgs) -> Result<()> {
-    let contributors_path = args.state_dir.join("contributors.json");
     let config = load_repo_config(args.config.as_deref())?;
 
-    // Read contributors.json
-    let contributors: HashMap<String, ContributorState> = if contributors_path.exists() {
-        let json = std::fs::read_to_string(&contributors_path)
-            .with_context(|| format!("Failed to read {:?}", contributors_path))?;
-        serde_json::from_str(&json).context("Failed to parse contributors.json")?
-    } else {
-        HashMap::new()
+    // Read contributors.json based on backend
+    let contributors: HashMap<String, ContributorState> = match args.state_backend {
+        StateBackend::File => {
+            let contributors_path = args.state_dir.join("contributors.json");
+            if contributors_path.exists() {
+                let json = std::fs::read_to_string(&contributors_path)
+                    .with_context(|| format!("Failed to read {:?}", contributors_path))?;
+                serde_json::from_str(&json).context("Failed to parse contributors.json")?
+            } else {
+                HashMap::new()
+            }
+        }
+        StateBackend::Git => {
+            let json = git_state::read_contributors(&args.repo)?;
+            serde_json::from_str(&json).context("Failed to parse contributors.json from git")?
+        }
     };
 
     // Look up contributor
@@ -371,9 +438,24 @@ fn credit_check_command(args: CheckArgs) -> Result<()> {
 
 /// Update contributor credit state
 fn credit_update_command(args: UpdateArgs) -> Result<()> {
+    let config = load_repo_config(args.config.as_deref())?;
+
+    match args.state_backend {
+        StateBackend::File => {
+            credit_update_file_backend(&args, &config)?;
+        }
+        StateBackend::Git => {
+            credit_update_git_backend(&args, &config)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Update credit state using file backend
+fn credit_update_file_backend(args: &UpdateArgs, config: &RepoConfig) -> Result<()> {
     let contributors_path = args.state_dir.join("contributors.json");
     let events_path = args.state_dir.join("events.json");
-    let config = load_repo_config(args.config.as_deref())?;
 
     // Create state directory if it doesn't exist
     std::fs::create_dir_all(&args.state_dir)
@@ -414,7 +496,7 @@ fn credit_update_command(args: UpdateArgs) -> Result<()> {
     contributors.insert(
         contributor_id_str.clone(),
         ContributorState {
-            username: args.username,
+            username: args.username.clone(),
             credit: credit_after,
             is_blacklisted,
         },
@@ -423,12 +505,12 @@ fn credit_update_command(args: UpdateArgs) -> Result<()> {
     // Create credit event
     let event = CreditEvent {
         contributor_id: args.contributor_id,
-        event_type: args.event_type,
+        event_type: args.event_type.clone(),
         delta: args.delta,
         credit_before,
         credit_after,
         pr_number: args.pr_number,
-        evaluation_summary: args.evaluation_summary,
+        evaluation_summary: args.evaluation_summary.clone(),
         timestamp: chrono::Utc::now().to_rfc3339(),
     };
     events.push(event);
@@ -442,6 +524,77 @@ fn credit_update_command(args: UpdateArgs) -> Result<()> {
         "Updated contributor {}: {} -> {} credit (delta: {})",
         args.contributor_id, credit_before, credit_after, args.delta
     );
+
+    Ok(())
+}
+
+/// Update credit state using git backend with retry logic
+fn credit_update_git_backend(args: &UpdateArgs, config: &RepoConfig) -> Result<()> {
+    let max_retries = 3;
+    let mut backoff_ms = 1000; // Start with 1 second
+
+    for attempt in 1..=max_retries {
+        match try_update_git_state(args, config) {
+            Ok(_) => return Ok(()),
+            Err(e) if attempt < max_retries && is_conflict_error(&e) => {
+                eprintln!(
+                    "Conflict detected on attempt {}/{}, retrying after {}ms...",
+                    attempt, max_retries, backoff_ms
+                );
+                std::thread::sleep(std::time::Duration::from_millis(backoff_ms));
+                backoff_ms *= 2; // Exponential backoff
+            }
+            Err(e) => {
+                if attempt == max_retries && is_conflict_error(&e) {
+                    bail!(
+                        "Failed to update git state after {} retries due to concurrent conflicts. \
+                        Please try again later.",
+                        max_retries
+                    );
+                } else {
+                    return Err(e);
+                }
+            }
+        }
+    }
+
+    unreachable!()
+}
+
+/// Check if error is a git conflict error
+fn is_conflict_error(err: &anyhow::Error) -> bool {
+    let err_str = err.to_string().to_lowercase();
+    err_str.contains("conflict")
+        || err_str.contains("rejected")
+        || err_str.contains("non-fast-forward")
+}
+
+/// Try to update git state once (may fail due to concurrent updates)
+fn try_update_git_state(args: &UpdateArgs, config: &RepoConfig) -> Result<()> {
+    // Create commit message with PR number and event type
+    let commit_msg = if let Some(pr_number) = args.pr_number {
+        format!(
+            "meritocrab: update credit for {} ({} #{})",
+            args.username, args.event_type, pr_number
+        )
+    } else {
+        format!(
+            "meritocrab: update credit for {} ({})",
+            args.username, args.event_type
+        )
+    };
+
+    git_state::update_git_state(
+        &args.repo,
+        args.contributor_id,
+        &args.username,
+        args.delta,
+        &args.event_type,
+        args.pr_number,
+        args.evaluation_summary.as_deref(),
+        &commit_msg,
+        config,
+    )?;
 
     Ok(())
 }
@@ -737,7 +890,9 @@ mod tests {
 
         // Check non-existent contributor - should return default credit
         let args = CheckArgs {
+            state_backend: StateBackend::File,
             state_dir: temp_dir.path().to_path_buf(),
+            repo: PathBuf::from("."),
             contributor_id: 12345678,
             config: None,
         };
@@ -762,7 +917,9 @@ mod tests {
 
         // Update credit
         let update_args = UpdateArgs {
+            state_backend: StateBackend::File,
             state_dir: temp_dir.path().to_path_buf(),
+            repo: PathBuf::from("."),
             contributor_id: 12345678,
             username: "alice".to_string(),
             delta: 15,
@@ -818,7 +975,9 @@ mod tests {
 
         // Update with large negative delta
         let update_args = UpdateArgs {
+            state_backend: StateBackend::File,
             state_dir: temp_dir.path().to_path_buf(),
+            repo: PathBuf::from("."),
             contributor_id: 99999999,
             username: "bob".to_string(),
             delta: -150,
@@ -856,7 +1015,9 @@ mod tests {
 
         // First update - credit still above threshold
         credit_update_command(UpdateArgs {
+            state_backend: StateBackend::File,
             state_dir: temp_dir.path().to_path_buf(),
+            repo: PathBuf::from("."),
             contributor_id: 55555555,
             username: "charlie".to_string(),
             delta: -50,
@@ -877,7 +1038,9 @@ mod tests {
 
         // Second update - drops to threshold
         credit_update_command(UpdateArgs {
+            state_backend: StateBackend::File,
             state_dir: temp_dir.path().to_path_buf(),
+            repo: PathBuf::from("."),
             contributor_id: 55555555,
             username: "charlie".to_string(),
             delta: -50,
@@ -945,7 +1108,9 @@ high = 5
 
         // Update with custom config - should use starting_credit = 200
         credit_update_command(UpdateArgs {
+            state_backend: StateBackend::File,
             state_dir: temp_dir.path().to_path_buf(),
+            repo: PathBuf::from("."),
             contributor_id: 77777777,
             username: "dave".to_string(),
             delta: 10,
@@ -965,7 +1130,9 @@ high = 5
 
         // Drop to just above custom blacklist threshold
         credit_update_command(UpdateArgs {
+            state_backend: StateBackend::File,
             state_dir: temp_dir.path().to_path_buf(),
+            repo: PathBuf::from("."),
             contributor_id: 77777777,
             username: "dave".to_string(),
             delta: -199,
@@ -986,7 +1153,9 @@ high = 5
 
         // Drop to threshold
         credit_update_command(UpdateArgs {
+            state_backend: StateBackend::File,
             state_dir: temp_dir.path().to_path_buf(),
+            repo: PathBuf::from("."),
             contributor_id: 77777777,
             username: "dave".to_string(),
             delta: -1,

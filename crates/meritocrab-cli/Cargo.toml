@@ -34,6 +34,8 @@ chrono = { workspace = true }
 # Async runtime
 tokio = { workspace = true }
 
+# Temporary directories for git operations
+tempfile = "3.17"
+
 [dev-dependencies]
 tokio = { workspace = true }
-tempfile = "3.17"
