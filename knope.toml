@@ -2,6 +2,13 @@
 versioned_files = [
     "Cargo.toml",
     "Cargo.lock",
+    # Sub-crate package versions
+    "crates/meritocrab-core/Cargo.toml",
+    "crates/meritocrab-github/Cargo.toml",
+    "crates/meritocrab-db/Cargo.toml",
+    "crates/meritocrab-llm/Cargo.toml",
+    "crates/meritocrab-api/Cargo.toml",
+    "crates/meritocrab-server/Cargo.toml",
     # Root facade deps
     { path = "Cargo.toml", dependency = "meritocrab-core" },
     { path = "Cargo.toml", dependency = "meritocrab-github" },

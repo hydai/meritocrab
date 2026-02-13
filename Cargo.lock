@@ -1511,7 +1511,7 @@ dependencies = [
 
 [[package]]
 name = "meritocrab-api"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "async-trait",
  "axum",
@@ -1544,7 +1544,7 @@ dependencies = [
 
 [[package]]
 name = "meritocrab-core"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "serde",
  "serde_json",
@@ -1553,7 +1553,7 @@ dependencies = [
 
 [[package]]
 name = "meritocrab-db"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "async-trait",
  "chrono",
@@ -1567,7 +1567,7 @@ dependencies = [
 
 [[package]]
 name = "meritocrab-github"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "async-trait",
  "axum",
@@ -1588,7 +1588,7 @@ dependencies = [
 
 [[package]]
 name = "meritocrab-llm"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "async-trait",
  "meritocrab-core",
@@ -1601,7 +1601,7 @@ dependencies = [
 
 [[package]]
 name = "meritocrab-server"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "axum",
  "config",
