@@ -1,3 +1,9 @@
+## 0.1.3 (2026-02-13)
+
+### Fixes
+
+- use explicit versions in sub-crates instead of workspace inheritance
+
 ## 0.1.2 (2026-02-13)
 
 ### Fixes

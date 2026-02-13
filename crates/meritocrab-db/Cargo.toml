@@ -1,7 +1,7 @@
 [package]
 name = "meritocrab-db"
 description = "Database layer for the Meritocrab reputation system"
-version = "0.1.2"
+version = "0.1.3"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -17,7 +17,7 @@ chrono = { workspace = true }
 async-trait = { workspace = true }
 tokio = { workspace = true }
 
-meritocrab-core = { path = "../meritocrab-core", version = "0.1.2" }
+meritocrab-core = { path = "../meritocrab-core", version = "0.1.3" }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt"] }

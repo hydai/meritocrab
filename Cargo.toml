@@ -1,7 +1,7 @@
 [package]
 name = "meritocrab"
 description = "A reputation system for open source repositories using LLM-based contribution evaluation"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT"
@@ -12,11 +12,11 @@ keywords = ["github", "reputation", "credit", "llm", "open-source"]
 categories = ["development-tools"]
 
 [dependencies]
-meritocrab-core = { path = "crates/meritocrab-core", version = "0.1.2" }
-meritocrab-github = { path = "crates/meritocrab-github", version = "0.1.2" }
-meritocrab-db = { path = "crates/meritocrab-db", version = "0.1.2" }
-meritocrab-llm = { path = "crates/meritocrab-llm", version = "0.1.2" }
-meritocrab-api = { path = "crates/meritocrab-api", version = "0.1.2" }
+meritocrab-core = { path = "crates/meritocrab-core", version = "0.1.3" }
+meritocrab-github = { path = "crates/meritocrab-github", version = "0.1.3" }
+meritocrab-db = { path = "crates/meritocrab-db", version = "0.1.3" }
+meritocrab-llm = { path = "crates/meritocrab-llm", version = "0.1.3" }
+meritocrab-api = { path = "crates/meritocrab-api", version = "0.1.3" }
 
 [workspace]
 members = [
