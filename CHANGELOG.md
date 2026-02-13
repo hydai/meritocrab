@@ -1,3 +1,14 @@
+## 0.1.5 (2026-02-13)
+
+### Features
+
+- add meritocrab-cli crate with evaluate subcommand
+- add credit state management subcommands
+- add git-branch state backend with retry-on-conflict
+- add pr-evaluate workflow for safe fork PR metadata extraction
+- add pr-gate workflow for privileged PR evaluation and gating
+- add pr-commands workflow for /credit issue comment commands
+
 ## 0.1.4 (2026-02-13)
 
 ### Fixes

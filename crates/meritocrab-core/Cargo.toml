@@ -1,7 +1,7 @@
 [package]
 name = "meritocrab-core"
 description = "Core credit scoring logic for the Meritocrab reputation system"
-version = "0.1.4"
+version = "0.1.5"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

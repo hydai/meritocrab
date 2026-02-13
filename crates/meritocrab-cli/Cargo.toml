@@ -1,7 +1,7 @@
 [package]
 name = "meritocrab-cli"
 description = "CLI binary for GitHub Actions mode of the Meritocrab reputation system"
-version = "0.1.4"
+version = "0.1.5"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -13,8 +13,8 @@ name = "meritocrab-cli"
 path = "src/main.rs"
 
 [dependencies]
-meritocrab-core = { path = "../meritocrab-core", version = "0.1.4" }
-meritocrab-llm = { path = "../meritocrab-llm", version = "0.1.4" }
+meritocrab-core = { path = "../meritocrab-core", version = "0.1.5" }
+meritocrab-llm = { path = "../meritocrab-llm", version = "0.1.5" }
 
 # CLI argument parsing
 clap = { version = "4.5.29", features = ["derive"] }
