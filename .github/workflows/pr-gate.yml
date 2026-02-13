@@ -1,0 +1,275 @@
+name: "Meritocrab: PR Gate"
+
+on:
+  workflow_run:
+    workflows: ["Meritocrab: PR Evaluate"]
+    types: [completed]
+
+# Only one gate run per PR at a time
+concurrency:
+  group: meritocrab-gate-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: true
+
+permissions:
+  pull-requests: write
+  issues: write
+  contents: write
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success'
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      # Download artifact from the triggering workflow run
+      - name: Download PR evaluation artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
+        with:
+          name: pr-evaluation-input
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Validate artifact and extract PR metadata for later steps
+      - name: Validate artifact and extract metadata
+        id: artifact
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd  # v8
+        with:
+          script: |
+            const fs = require('fs');
+
+            // Read artifact file
+            const artifactPath = 'pr-evaluation-input.json';
+            if (!fs.existsSync(artifactPath)) {
+              core.setFailed('Artifact file not found');
+              return;
+            }
+
+            let artifact;
+            try {
+              artifact = JSON.parse(fs.readFileSync(artifactPath, 'utf8'));
+            } catch (e) {
+              core.setFailed(`Invalid artifact JSON: ${e.message}`);
+              return;
+            }
+
+            // Validate schema version
+            if (artifact.schema_version !== 1) {
+              core.setFailed(`Unsupported schema version: ${artifact.schema_version}`);
+              return;
+            }
+
+            // Validate required fields exist
+            const required = ['pr_number', 'pr_author', 'pr_author_id', 'pr_title',
+                              'base_repo', 'head_repo', 'diff_stats', 'event_timestamp'];
+            for (const field of required) {
+              if (artifact[field] === undefined || artifact[field] === null) {
+                core.setFailed(`Missing required field: ${field}`);
+                return;
+              }
+            }
+
+            // Validate field types to prevent injection via malformed artifact
+            if (typeof artifact.pr_number !== 'number' || !Number.isInteger(artifact.pr_number)) {
+              core.setFailed('pr_number must be an integer');
+              return;
+            }
+            if (typeof artifact.pr_author_id !== 'number' || !Number.isInteger(artifact.pr_author_id)) {
+              core.setFailed('pr_author_id must be an integer');
+              return;
+            }
+
+            // Set outputs for subsequent steps (safe — via core.setOutput, not shell)
+            core.setOutput('pr_number', artifact.pr_number.toString());
+            core.setOutput('pr_author', artifact.pr_author);
+            core.setOutput('pr_author_id', artifact.pr_author_id.toString());
+            core.info(`Validated artifact for PR #${artifact.pr_number} by @${artifact.pr_author}`);
+
+      # Checkout the repository (base branch only — for cargo install and state branch access)
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+
+      # Install Rust toolchain
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9  # v1
+        with:
+          toolchain: stable
+
+      # Cache Rust dependencies for faster builds
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@ad397744b0d591a723ab90405b7247fac0e6b8db  # v2
+
+      # Build and install meritocrab-cli from the repository
+      - name: Install meritocrab-cli
+        run: cargo install --path crates/meritocrab-cli --locked
+
+      # Initialize state branch if it doesn't exist
+      - name: Initialize state branch
+        run: |
+          if ! git rev-parse --verify meritocrab-data 2>/dev/null; then
+            meritocrab-cli state init --repo .
+          fi
+
+      # Check contributor credit (uses execFileSync to avoid shell injection)
+      - name: Check contributor credit
+        id: credit-check
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd  # v8
+        with:
+          script: |
+            const { execFileSync } = require('child_process');
+            const prAuthorId = '${{ steps.artifact.outputs.pr_author_id }}';
+
+            let creditResult;
+            try {
+              const output = execFileSync('meritocrab-cli', [
+                'credit', 'check',
+                '--state-backend', 'git',
+                '--repo', '.',
+                '--contributor-id', prAuthorId
+              ], { encoding: 'utf8' });
+              creditResult = JSON.parse(output);
+            } catch (e) {
+              core.warning(`Credit check failed: ${e.message}. Allowing PR through.`);
+              core.setOutput('below_threshold', 'false');
+              core.setOutput('credit', '100');
+              return;
+            }
+
+            core.info(`Contributor ${prAuthorId} credit: ${creditResult.credit}, blacklisted: ${creditResult.is_blacklisted}`);
+            core.setOutput('credit', creditResult.credit.toString());
+            core.setOutput('is_blacklisted', creditResult.is_blacklisted.toString());
+
+            // Check if credit is below PR threshold (default: 50)
+            const prThreshold = 50;
+            const belowThreshold = creditResult.credit < prThreshold || creditResult.is_blacklisted;
+            core.setOutput('below_threshold', belowThreshold.toString());
+
+      # Close PR if credit is below threshold
+      - name: Close PR (insufficient credit)
+        if: steps.credit-check.outputs.below_threshold == 'true'
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd  # v8
+        with:
+          script: |
+            const prNumber = parseInt('${{ steps.artifact.outputs.pr_number }}');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: [
+                '🦀 **Meritocrab**: This PR was automatically closed based on contributor history.',
+                '',
+                'If you believe this is an error, please contact the repository maintainers.'
+              ].join('\n')
+            });
+
+            await github.rest.pulls.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+              state: 'closed'
+            });
+
+            core.info(`Closed PR #${prNumber} due to insufficient credit`);
+
+      # Run LLM evaluation via CLI (skip if PR was closed)
+      # Uses env var for config to avoid leaking secrets in process args
+      - name: Evaluate PR quality
+        id: evaluate
+        if: steps.credit-check.outputs.below_threshold != 'true'
+        continue-on-error: true
+        run: meritocrab-cli evaluate --input pr-evaluation-input.json --llm-config "$LLM_CONFIG" > evaluation-result.json
+        env:
+          LLM_CONFIG: '{"provider":"claude","api_key":"${{ secrets.MERITOCRAB_LLM_API_KEY }}"}'
+
+      # Update credit based on evaluation result (uses execFileSync to avoid shell injection)
+      - name: Update contributor credit
+        id: credit-update
+        if: steps.credit-check.outputs.below_threshold != 'true' && steps.evaluate.outcome == 'success'
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd  # v8
+        with:
+          script: |
+            const fs = require('fs');
+            const { execFileSync } = require('child_process');
+
+            const result = JSON.parse(fs.readFileSync('evaluation-result.json', 'utf8'));
+            const prAuthorId = '${{ steps.artifact.outputs.pr_author_id }}';
+            const prAuthor = '${{ steps.artifact.outputs.pr_author }}';
+            const prNumber = '${{ steps.artifact.outputs.pr_number }}';
+
+            // Use execFileSync with argument array to prevent shell injection
+            try {
+              execFileSync('meritocrab-cli', [
+                'credit', 'update',
+                '--state-backend', 'git',
+                '--repo', '.',
+                '--contributor-id', prAuthorId,
+                '--username', prAuthor,
+                '--delta', result.credit_delta.toString(),
+                '--event-type', 'pr_opened',
+                '--pr-number', prNumber,
+                '--evaluation-summary', `${result.classification} (confidence: ${result.confidence})`
+              ], { encoding: 'utf8', stdio: 'inherit' });
+              core.info(`Updated credit for ${prAuthor}: delta ${result.credit_delta}`);
+            } catch (e) {
+              core.warning(`Credit update failed: ${e.message}`);
+            }
+
+            // Pass evaluation result to comment step via outputs
+            core.setOutput('classification', result.classification);
+            core.setOutput('confidence', result.confidence.toString());
+            core.setOutput('reasoning', result.reasoning);
+            core.setOutput('credit_delta', result.credit_delta.toString());
+
+      # Post evaluation comment on the PR
+      - name: Post evaluation comment
+        if: steps.credit-check.outputs.below_threshold != 'true' && steps.evaluate.outcome == 'success'
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd  # v8
+        with:
+          script: |
+            const fs = require('fs');
+
+            // Read evaluation result directly from file (avoids step output injection)
+            const result = JSON.parse(fs.readFileSync('evaluation-result.json', 'utf8'));
+            const prNumber = parseInt('${{ steps.artifact.outputs.pr_number }}');
+            const currentCredit = '${{ steps.credit-check.outputs.credit }}';
+
+            const qualityEmoji = {
+              'spam': '🚫',
+              'low': '⚠️',
+              'acceptable': '✅',
+              'high': '🌟'
+            };
+
+            const emoji = qualityEmoji[result.classification] || '❓';
+            const deltaSign = result.credit_delta >= 0 ? '+' : '';
+
+            const body = [
+              '## 🦀 Meritocrab Evaluation',
+              '',
+              '| Field | Value |',
+              '|-------|-------|',
+              `| **Quality** | ${emoji} ${result.classification} |`,
+              `| **Confidence** | ${(result.confidence * 100).toFixed(0)}% |`,
+              `| **Credit Change** | ${deltaSign}${result.credit_delta} |`,
+              '',
+              `**Reasoning:** ${result.reasoning}`,
+              '',
+              '<sub>Powered by <a href="https://github.com/nicholasgasior/meritocrab">Meritocrab</a></sub>'
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: body
+            });
+
+            core.info(`Posted evaluation comment on PR #${prNumber}`);
+
+      # Log if LLM evaluation failed (don't gate the PR)
+      - name: Log evaluation failure
+        if: steps.credit-check.outputs.below_threshold != 'true' && steps.evaluate.outcome == 'failure'
+        run: |
+          echo "::warning::LLM evaluation failed. PR was not gated based on a failed evaluation."
+          echo "::warning::Check the 'Evaluate PR quality' step logs for details."
