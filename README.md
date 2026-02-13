@@ -16,6 +16,65 @@ A reputation/credit system for open source repositories that grades contributors
 - **Flexible Configuration**: Per-repository custom scoring via `.meritocrab.toml`
 - **Role-Based Bypass**: Maintainers and collaborators exempt from checks
 - **Audit Trail**: Complete history of all credit changes with maintainer overrides
+- **GitHub Actions Mode**: Run Meritocrab without a server using GitHub Actions workflows
+
+## Deployment Options
+
+Meritocrab can be deployed in two modes:
+
+### Server Mode (Full-Featured)
+
+Deploy Meritocrab as a standalone server with a GitHub App. Best for production, high-traffic repositories, and teams that need the full feature set.
+
+**Pros:**
+- Complete feature set (maintainer dashboard, admin API, OAuth)
+- Real-time webhook processing (~1s latency)
+- Robust SQL-backed state storage (SQLite/PostgreSQL)
+- Multi-repository support from a single server
+- Advanced concurrency control for LLM evaluations
+
+**Cons:**
+- Requires server infrastructure (hosting, domain, SSL)
+- More complex setup (GitHub App creation, webhook configuration)
+- Ongoing maintenance and monitoring
+
+**Setup**: See [Server Setup Guide](SETUP.md)
+
+### GitHub Actions Mode (Zero Infrastructure)
+
+Run Meritocrab using GitHub Actions workflows. Best for small-to-medium repositories that want quick adoption without managing infrastructure.
+
+**Pros:**
+- Zero infrastructure (no server, domain, or SSL needed)
+- Simple setup (copy 3 workflow files + 1 repository secret)
+- Free for public repositories (unlimited Actions minutes)
+- Git-branch-based state storage (full audit trail via git history)
+- Automatic scaling with GitHub's workflow runners
+
+**Cons:**
+- No maintainer dashboard or admin API
+- Higher latency (~1-2 min workflow queue + run time)
+- Limited to single-repository scope
+- Eventual consistency for credit state (retry-on-conflict)
+- Requires Rust ecosystem for CLI binary
+
+**Setup**: See [GitHub Actions Setup Guide](docs/github-actions-setup.md)
+
+### Comparison Table
+
+| Feature | Server Mode | GitHub Actions Mode |
+|---------|-------------|---------------------|
+| Setup complexity | High | **Low** |
+| Infrastructure cost | Server hosting required | **Free** (within GitHub limits) |
+| Latency | **~1s** (webhook) | ~1-2 min (workflow) |
+| Maintainer dashboard | **Yes** | No |
+| Admin API | **Yes** | No |
+| `/credit` commands | **Yes** | **Yes** |
+| State durability | **Strong** (SQL ACID) | Moderate (git branch) |
+| Multi-repo support | **Yes** (one server) | No (per-repo workflows) |
+| Best for | Production, high-traffic repos | **Quick adoption, small-medium repos** |
+
+**Migration path**: You can start with GitHub Actions mode and migrate to server mode later if your repository outgrows it. Credit data transfers seamlessly between modes.
 
 ## Installation
 
