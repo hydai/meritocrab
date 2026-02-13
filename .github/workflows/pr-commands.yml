@@ -1,0 +1,335 @@
+name: "Meritocrab: PR Commands"
+
+on:
+  issue_comment:
+    types: [created]
+
+# Only one command per PR at a time
+concurrency:
+  group: meritocrab-commands-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+permissions:
+  pull-requests: write
+  issues: write
+  contents: write
+
+jobs:
+  handle-command:
+    runs-on: ubuntu-latest
+    # Only trigger on PR comments (not issue comments) starting with /credit
+    if: >-
+      github.event.issue.pull_request &&
+      startsWith(github.event.comment.body, '/credit')
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      # Parse the command and check permissions (all in JavaScript, no shell interpolation)
+      - name: Parse command and check permissions
+        id: parse
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd  # v8
+        with:
+          script: |
+            // SECURITY: All comment.body parsing happens in JavaScript, never shell.
+            // CLI calls use execFileSync with argument arrays (no shell injection).
+            const commentBody = context.payload.comment.body;
+            const commentAuthor = context.payload.comment.user.login;
+            const prNumber = context.payload.issue.number;
+
+            // Check if commenter has write or admin permission
+            let permission;
+            try {
+              const { data: permData } = await github.rest.repos.getCollaboratorPermissionLevel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                username: commentAuthor
+              });
+              permission = permData.permission;
+            } catch (e) {
+              core.info(`Permission check failed for ${commentAuthor}: ${e.message}`);
+              core.setOutput('authorized', 'false');
+              return;
+            }
+
+            const authorized = permission === 'admin' || permission === 'write';
+            core.setOutput('authorized', authorized.toString());
+
+            if (!authorized) {
+              core.info(`User ${commentAuthor} has '${permission}' permission — insufficient for /credit commands`);
+              return;
+            }
+
+            // Parse the command: /credit <subcommand> [args...]
+            const parts = commentBody.trim().split(/\s+/);
+            // parts[0] = '/credit', parts[1] = subcommand, rest = args
+            const subcommand = parts.length > 1 ? parts[1] : '';
+            core.setOutput('subcommand', subcommand);
+            core.setOutput('pr_number', prNumber.toString());
+
+            if (subcommand === 'check') {
+              // /credit check @username or /credit check <user-id>
+              const target = parts.length > 2 ? parts[2].replace(/^@/, '') : '';
+              core.setOutput('target_username', target);
+              core.info(`Parsed: /credit check ${target}`);
+
+            } else if (subcommand === 'override') {
+              // /credit override @username <credit-value>
+              const target = parts.length > 2 ? parts[2].replace(/^@/, '') : '';
+              const creditValue = parts.length > 3 ? parts[3] : '';
+              core.setOutput('target_username', target);
+              core.setOutput('credit_value', creditValue);
+              core.info(`Parsed: /credit override ${target} ${creditValue}`);
+
+            } else if (subcommand === 'blacklist') {
+              // /credit blacklist @username [--remove]
+              const target = parts.length > 2 ? parts[2].replace(/^@/, '') : '';
+              const remove = parts.includes('--remove');
+              core.setOutput('target_username', target);
+              core.setOutput('remove_blacklist', remove.toString());
+              core.info(`Parsed: /credit blacklist ${target} ${remove ? '--remove' : ''}`);
+
+            } else {
+              core.setOutput('subcommand', 'invalid');
+              core.info(`Unknown subcommand: ${subcommand}`);
+            }
+
+      # Reply with help for invalid subcommand
+      - name: Reply (invalid command)
+        if: steps.parse.outputs.authorized == 'true' && steps.parse.outputs.subcommand == 'invalid'
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd  # v8
+        with:
+          script: |
+            const prNumber = parseInt('${{ steps.parse.outputs.pr_number }}');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: [
+                '🦀 **Meritocrab**: Unknown command.',
+                '',
+                'Available commands:',
+                '- `/credit check @username` — Check contributor credit score',
+                '- `/credit override @username <value>` — Set credit to exact value',
+                '- `/credit blacklist @username` — Add to blacklist',
+                '- `/credit blacklist @username --remove` — Remove from blacklist'
+              ].join('\n')
+            });
+
+      # Checkout repo and install CLI (only if authorized and valid command)
+      - name: Checkout repository
+        if: steps.parse.outputs.authorized == 'true' && steps.parse.outputs.subcommand != 'invalid' && steps.parse.outputs.subcommand != ''
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+
+      - name: Install Rust toolchain
+        if: steps.parse.outputs.authorized == 'true' && steps.parse.outputs.subcommand != 'invalid' && steps.parse.outputs.subcommand != ''
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9  # v1
+        with:
+          toolchain: stable
+
+      - name: Cache Rust dependencies
+        if: steps.parse.outputs.authorized == 'true' && steps.parse.outputs.subcommand != 'invalid' && steps.parse.outputs.subcommand != ''
+        uses: Swatinem/rust-cache@ad397744b0d591a723ab90405b7247fac0e6b8db  # v2
+
+      - name: Install meritocrab-cli
+        if: steps.parse.outputs.authorized == 'true' && steps.parse.outputs.subcommand != 'invalid' && steps.parse.outputs.subcommand != ''
+        run: cargo install --path crates/meritocrab-cli --locked
+
+      # Initialize state branch if needed
+      - name: Initialize state branch
+        if: steps.parse.outputs.authorized == 'true' && steps.parse.outputs.subcommand != 'invalid' && steps.parse.outputs.subcommand != ''
+        run: |
+          if ! git rev-parse --verify meritocrab-data 2>/dev/null; then
+            meritocrab-cli state init --repo .
+          fi
+
+      # Handle /credit check
+      - name: Execute /credit check
+        if: steps.parse.outputs.authorized == 'true' && steps.parse.outputs.subcommand == 'check'
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd  # v8
+        with:
+          script: |
+            const { execFileSync } = require('child_process');
+            const targetUsername = '${{ steps.parse.outputs.target_username }}';
+            const prNumber = parseInt('${{ steps.parse.outputs.pr_number }}');
+
+            // Look up the GitHub user ID from username
+            let userId;
+            try {
+              const { data: user } = await github.rest.users.getByUsername({
+                username: targetUsername
+              });
+              userId = user.id.toString();
+            } catch (e) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: `🦀 **Meritocrab**: User \`@${targetUsername}\` not found.`
+              });
+              return;
+            }
+
+            let creditResult;
+            try {
+              const output = execFileSync('meritocrab-cli', [
+                'credit', 'check',
+                '--state-backend', 'git',
+                '--repo', '.',
+                '--contributor-id', userId
+              ], { encoding: 'utf8' });
+              creditResult = JSON.parse(output);
+            } catch (e) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: `🦀 **Meritocrab**: Failed to check credit for \`@${targetUsername}\`: ${e.message}`
+              });
+              return;
+            }
+
+            const statusEmoji = creditResult.is_blacklisted ? '🚫' : '✅';
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: [
+                `## 🦀 Meritocrab Credit Check`,
+                '',
+                `| Field | Value |`,
+                `|-------|-------|`,
+                `| **Contributor** | @${targetUsername} |`,
+                `| **Credit Score** | ${creditResult.credit} |`,
+                `| **Status** | ${statusEmoji} ${creditResult.is_blacklisted ? 'Blacklisted' : 'Active'} |`
+              ].join('\n')
+            });
+
+      # Handle /credit override
+      - name: Execute /credit override
+        if: steps.parse.outputs.authorized == 'true' && steps.parse.outputs.subcommand == 'override'
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd  # v8
+        with:
+          script: |
+            const { execFileSync } = require('child_process');
+            const targetUsername = '${{ steps.parse.outputs.target_username }}';
+            const creditValue = '${{ steps.parse.outputs.credit_value }}';
+            const prNumber = parseInt('${{ steps.parse.outputs.pr_number }}');
+            const commandAuthor = context.payload.comment.user.login;
+
+            if (!creditValue || isNaN(parseInt(creditValue))) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: '🦀 **Meritocrab**: Invalid credit value. Usage: `/credit override @username <number>`'
+              });
+              return;
+            }
+
+            // Look up user ID
+            let userId;
+            try {
+              const { data: user } = await github.rest.users.getByUsername({
+                username: targetUsername
+              });
+              userId = user.id.toString();
+            } catch (e) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: `🦀 **Meritocrab**: User \`@${targetUsername}\` not found.`
+              });
+              return;
+            }
+
+            try {
+              execFileSync('meritocrab-cli', [
+                'credit', 'update',
+                '--state-backend', 'git',
+                '--repo', '.',
+                '--contributor-id', userId,
+                '--username', targetUsername,
+                '--delta', creditValue,
+                '--event-type', 'maintainer_override',
+                '--override',
+                '--evaluation-summary', `Maintainer override by ${commandAuthor}`
+              ], { encoding: 'utf8', stdio: 'inherit' });
+            } catch (e) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: `🦀 **Meritocrab**: Failed to override credit: ${e.message}`
+              });
+              return;
+            }
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: `🦀 **Meritocrab**: Credit for \`@${targetUsername}\` set to **${creditValue}**.`
+            });
+
+      # Handle /credit blacklist
+      - name: Execute /credit blacklist
+        if: steps.parse.outputs.authorized == 'true' && steps.parse.outputs.subcommand == 'blacklist'
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd  # v8
+        with:
+          script: |
+            const { execFileSync } = require('child_process');
+            const targetUsername = '${{ steps.parse.outputs.target_username }}';
+            const removeBlacklist = '${{ steps.parse.outputs.remove_blacklist }}' === 'true';
+            const prNumber = parseInt('${{ steps.parse.outputs.pr_number }}');
+            const commandAuthor = context.payload.comment.user.login;
+
+            // Look up user ID
+            let userId;
+            try {
+              const { data: user } = await github.rest.users.getByUsername({
+                username: targetUsername
+              });
+              userId = user.id.toString();
+            } catch (e) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: `🦀 **Meritocrab**: User \`@${targetUsername}\` not found.`
+              });
+              return;
+            }
+
+            const blacklistValue = removeBlacklist ? 'false' : 'true';
+            const action = removeBlacklist ? 'removed from blacklist' : 'blacklisted';
+
+            try {
+              execFileSync('meritocrab-cli', [
+                'credit', 'update',
+                '--state-backend', 'git',
+                '--repo', '.',
+                '--contributor-id', userId,
+                '--username', targetUsername,
+                '--delta', '0',
+                '--event-type', removeBlacklist ? 'blacklist_removed' : 'blacklisted',
+                '--set-blacklisted', blacklistValue,
+                '--evaluation-summary', `${action} by ${commandAuthor}`
+              ], { encoding: 'utf8', stdio: 'inherit' });
+            } catch (e) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: `🦀 **Meritocrab**: Failed to update blacklist: ${e.message}`
+              });
+              return;
+            }
+
+            const emoji = removeBlacklist ? '✅' : '🚫';
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: `${emoji} **Meritocrab**: \`@${targetUsername}\` has been ${action}.`
+            });

@@ -128,7 +128,7 @@ struct UpdateArgs {
     #[arg(long)]
     username: String,
 
-    /// Credit delta to apply
+    /// Credit delta to apply (or absolute value when --override is set)
     #[arg(long)]
     delta: i32,
 
@@ -147,6 +147,14 @@ struct UpdateArgs {
     /// Path to .meritocrab.toml config file
     #[arg(long)]
     config: Option<PathBuf>,
+
+    /// Treat delta as an absolute credit value instead of a delta
+    #[arg(long, default_value = "false")]
+    r#override: bool,
+
+    /// Explicitly set blacklist status (true/false)
+    #[arg(long)]
+    set_blacklisted: Option<bool>,
 }
 
 /// PR evaluation artifact schema (from DESIGN-github-actions.md Section 3)
@@ -486,11 +494,20 @@ fn credit_update_file_backend(args: &UpdateArgs, config: &RepoConfig) -> Result<
         .map(|s| s.credit)
         .unwrap_or(config.starting_credit);
 
-    // Apply credit delta with clamping to 0
-    let credit_after = apply_credit(credit_before, args.delta);
+    // Apply credit: either absolute override or delta
+    let credit_after = if args.r#override {
+        // Override mode: delta value is the absolute credit to set
+        std::cmp::max(0, args.delta)
+    } else {
+        apply_credit(credit_before, args.delta)
+    };
 
-    // Check blacklist status
-    let is_blacklisted = check_blacklist(credit_after, config.blacklist_threshold);
+    // Determine blacklist status: explicit flag takes priority, else check threshold
+    let is_blacklisted = if let Some(bl) = args.set_blacklisted {
+        bl
+    } else {
+        check_blacklist(credit_after, config.blacklist_threshold)
+    };
 
     // Update contributor state
     contributors.insert(
@@ -594,6 +611,8 @@ fn try_update_git_state(args: &UpdateArgs, config: &RepoConfig) -> Result<()> {
         args.evaluation_summary.as_deref(),
         &commit_msg,
         config,
+        args.r#override,
+        args.set_blacklisted,
     )?;
 
     Ok(())
@@ -927,6 +946,8 @@ mod tests {
             pr_number: Some(42),
             evaluation_summary: Some("High quality PR".to_string()),
             config: None,
+            r#override: false,
+            set_blacklisted: None,
         };
 
         credit_update_command(update_args).unwrap();
@@ -985,6 +1006,8 @@ mod tests {
             pr_number: None,
             evaluation_summary: None,
             config: None,
+            r#override: false,
+            set_blacklisted: None,
         };
 
         credit_update_command(update_args).unwrap();
@@ -1025,6 +1048,8 @@ mod tests {
             pr_number: None,
             evaluation_summary: None,
             config: None,
+            r#override: false,
+            set_blacklisted: None,
         })
         .unwrap();
 
@@ -1048,6 +1073,8 @@ mod tests {
             pr_number: None,
             evaluation_summary: None,
             config: None,
+            r#override: false,
+            set_blacklisted: None,
         })
         .unwrap();
 
@@ -1118,6 +1145,8 @@ high = 5
             pr_number: None,
             evaluation_summary: None,
             config: Some(config_path.clone()),
+            r#override: false,
+            set_blacklisted: None,
         })
         .unwrap();
 
@@ -1140,6 +1169,8 @@ high = 5
             pr_number: None,
             evaluation_summary: None,
             config: Some(config_path.clone()),
+            r#override: false,
+            set_blacklisted: None,
         })
         .unwrap();
 
@@ -1163,6 +1194,8 @@ high = 5
             pr_number: None,
             evaluation_summary: None,
             config: Some(config_path),
+            r#override: false,
+            set_blacklisted: None,
         })
         .unwrap();
 

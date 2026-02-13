@@ -145,6 +145,8 @@ pub fn update_git_state(
     evaluation_summary: Option<&str>,
     commit_msg: &str,
     config: &RepoConfig,
+    is_override: bool,
+    set_blacklisted: Option<bool>,
 ) -> Result<()> {
     // Create temporary directory for the operation
     let temp_dir = tempfile::TempDir::new().context("Failed to create temp directory")?;
@@ -191,11 +193,19 @@ pub fn update_git_state(
         .map(|s| s.credit)
         .unwrap_or(config.starting_credit);
 
-    // Apply credit delta with clamping to 0
-    let credit_after = apply_credit(credit_before, delta);
+    // Apply credit: either absolute override or delta
+    let credit_after = if is_override {
+        std::cmp::max(0, delta)
+    } else {
+        apply_credit(credit_before, delta)
+    };
 
-    // Check blacklist status
-    let is_blacklisted = check_blacklist(credit_after, config.blacklist_threshold);
+    // Determine blacklist status: explicit flag takes priority, else check threshold
+    let is_blacklisted = if let Some(bl) = set_blacklisted {
+        bl
+    } else {
+        check_blacklist(credit_after, config.blacklist_threshold)
+    };
 
     // Update contributor state
     contributors.insert(
