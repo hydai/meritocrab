@@ -1,0 +1,119 @@
+name: "Meritocrab: PR Evaluate"
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+# Prevent duplicate runs on rapid pushes to the same PR
+concurrency:
+  group: meritocrab-evaluate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  pull-requests: read
+  contents: read
+
+jobs:
+  extract-and-package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Extract PR metadata and package artifact
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd  # v8
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            // Extract PR metadata from context (safe - no shell interpolation)
+            const pr = context.payload.pull_request;
+            const prNumber = pr.number;
+            const prAuthor = pr.user.login;
+            const prAuthorId = pr.user.id;
+            const prTitle = pr.title;
+            const prBody = pr.body || '';
+            const baseRepo = pr.base.repo.full_name;
+            const headRepo = pr.head.repo ? pr.head.repo.full_name : baseRepo;
+            const eventTimestamp = new Date().toISOString();
+
+            // Diff stats from PR object
+            const diffStats = {
+              additions: pr.additions,
+              deletions: pr.deletions,
+              changed_files: pr.changed_files
+            };
+
+            core.info(`Processing PR #${prNumber} by @${prAuthor} (ID: ${prAuthorId})`);
+            core.info(`Base: ${baseRepo}, Head: ${headRepo}`);
+            core.info(`Changes: +${diffStats.additions} -${diffStats.deletions} across ${diffStats.changed_files} files`);
+
+            // Fetch file list via GitHub API
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+              per_page: 100
+            });
+
+            const fileList = files.map(f => f.filename);
+            core.info(`Files changed: ${fileList.join(', ')}`);
+
+            // Fetch diff content via GitHub API with diff media type
+            let diffContent = '';
+            try {
+              const { data: diff } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber,
+                mediaType: {
+                  format: 'diff'
+                }
+              });
+
+              // Truncate diff to 10KB max
+              const maxDiffSize = 10 * 1024; // 10KB
+              if (diff.length > maxDiffSize) {
+                diffContent = diff.substring(0, maxDiffSize);
+                core.warning(`Diff truncated from ${diff.length} to ${maxDiffSize} bytes`);
+              } else {
+                diffContent = diff;
+              }
+            } catch (error) {
+              core.warning(`Failed to fetch diff: ${error.message}`);
+              diffContent = `(failed to fetch: ${error.message})`;
+            }
+
+            // Build artifact JSON matching the schema from DESIGN Section 3
+            const artifact = {
+              schema_version: 1,
+              pr_number: prNumber,
+              pr_author: prAuthor,
+              pr_author_id: prAuthorId,
+              pr_title: prTitle,
+              pr_body: prBody,
+              base_repo: baseRepo,
+              head_repo: headRepo,
+              diff_stats: diffStats,
+              file_list: fileList,
+              diff_content: diffContent,
+              event_timestamp: eventTimestamp
+            };
+
+            // Write artifact to file
+            const artifactPath = path.join(process.env.RUNNER_TEMP, 'pr-evaluation-input.json');
+            fs.writeFileSync(artifactPath, JSON.stringify(artifact, null, 2));
+            core.info(`Artifact written to ${artifactPath}`);
+
+            // Set output for upload step
+            core.setOutput('artifact_path', artifactPath);
+
+            // Log artifact size
+            const artifactSize = fs.statSync(artifactPath).size;
+            core.info(`Artifact size: ${artifactSize} bytes`);
+
+      - name: Upload evaluation artifact
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882  # v4.4.3
+        with:
+          name: pr-evaluation-input
+          path: ${{ runner.temp }}/pr-evaluation-input.json
+          retention-days: 7
+          if-no-files-found: error
