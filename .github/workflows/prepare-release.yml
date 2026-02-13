@@ -17,7 +17,7 @@ jobs:
         run: |
           git config --global user.name "GitHub Actions"
           git config user.email "[email protected]"
-      - uses: knope-dev/action@v2
+      - uses: knope-dev/action@v2.1.1
         with:
           version: 0.22.2
       - run: knope prepare-release --verbose
